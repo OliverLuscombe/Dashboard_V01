@@ -1,0 +1,5 @@
+
+reflex[db]==0.9.12
+xy[reflex]==0.0.7
+faker
+psycopg[binary]>=3.1.8

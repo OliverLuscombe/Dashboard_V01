@@ -1,0 +1,967 @@
+I want you to design and build a HIGH-FIDELITY VISUAL PROTOTYPE for a university research dashboard.
+IMPORTANT CONTEXT:
+This is only an initial DESIGN / UI PROTOTYPE and SCAFFOLDING exercise.
+DO NOT treat any generated implementation as production source code.
+DO NOT request, use, upload, infer, or simulate any confidential/client research dataset.
+Use entirely synthetic / mock / placeholder data for everything.
+The purpose of this exercise is primarily to explore:
+layout
+information hierarchy
+visual design
+navigation
+dashboard interactions
+usability
+accessibility
+how scientific information could be presented
+I care MUCH MORE about the dashboard looking polished, professional and intuitive than about the underlying calculations being scientifically accurate at this stage.
+==================================================
+PROJECT
+Project title:
+“Modelling Antarctic Sea Ice with Supervised Machine Learning and Satellite Data”
+The project investigates Antarctic sea ice and its relationship with environmental and topographical variables.
+The client currently relies heavily on static images/screenshots and separate tables to communicate research findings.
+The dashboard should replace that disconnected experience with a dynamic, interactive environment where researchers can explore Antarctic sea ice, environmental conditions and machine learning outputs together.
+The system ultimately involves:
+Antarctic sea ice data
+Environmental data
+Topographical / geographic data
+Machine learning model outputs
+Seasonal comparison
+Interactive geographic visualisation
+The prototype should communicate the concept of a serious scientific/research tool.
+This is NOT:
+a consumer weather app
+a climate activism website
+a marketing landing page
+a generic corporate analytics dashboard
+a futuristic sci-fi interface
+It should feel like a modern scientific research platform.
+Think:
+NASA Earthdata
+Copernicus Climate Data Store
+ArcGIS
+modern geospatial analytics software
+high-quality university research dashboards
+BUT make it significantly cleaner, less cluttered and more contemporary.
+==================================================
+PRIMARY DESIGN GOAL
+Design a dashboard that allows a researcher or non-technical stakeholder to very quickly understand:
+“What is happening to Antarctic sea ice?”
+“Where is it happening?”
+“When is it happening?”
+“What environmental variables appear to be associated with it?”
+“What does the machine learning model identify?”
+The dashboard should feel understandable within approximately 5–10 seconds of opening it.
+The Antarctic map should be the visual centrepiece.
+Avoid overwhelming the user with dozens of graphs immediately.
+Use progressive disclosure:
+show the most useful information first,
+then allow researchers to explore deeper.
+==================================================
+CORE REQUIREMENTS
+The dashboard MUST support or visually prototype the following requirements.
+ANTARCTIC MAP
+Include a large visualisation of Antarctica.
+Ideally use a south-polar / Antarctic projection rather than a typical Mercator world map.
+The map should clearly show:
+Antarctic land mass
+surrounding ocean
+marginal ice zone
+sea ice extent / concentration
+environmental overlays
+The map should be the main visual element of the dashboard.
+Allow:
+zoom in
+zoom out
+reset view
+pan
+hover
+click regions
+inspect a location
+If fully implementing the geographic functionality is difficult in the prototype, create a visually convincing simulated version.
+==================================================
+2. TOGGLEABLE MAP LAYERS
+The prototype must include AT LEAST THREE toggleable layers.
+For example:
+Sea Ice Concentration
+Sea Surface Temperature
+Wind Speed
+Air Temperature
+Surface Pressure
+Ocean Current
+Bathymetry / Topography
+The UI should clearly allow layers to be:
+ON / OFF
+Do not simply put everything into one dropdown.
+I want a clear “Layers” control.
+Example:
+LAYERS
+[x] Sea Ice Concentration
+[x] Marginal Ice Zone
+[ ] Sea Surface Temperature
+[ ] Wind Speed
+[ ] Air Temperature
+[ ] Bathymetry
+Each layer should have:
+a small icon
+visibility toggle
+colour legend where relevant
+Consider allowing:
+layer opacity adjustment
+reorder layers
+But do not make the interface excessively complex.
+==================================================
+3. MARGINAL ICE ZONE
+The Marginal Ice Zone is extremely important.
+Make it visually distinguishable from the rest of the sea ice.
+There should be a way to toggle something like:
+[x] Marginal Ice Zone Boundary
+The user should be able to zoom closely into the ice edge and observe comparatively small changes.
+Include an appropriate legend.
+Do NOT rely exclusively on colour to distinguish it.
+For example use:
+line styles
+boundaries
+patterns
+contrasting outlines
+==================================================
+4. TIME CONTROLS
+The dashboard must allow the user to examine change over time.
+Include a prominent timeline / time slider.
+The main seasonal periods of interest are:
+FEBRUARY
+Typical Antarctic sea ice minimum / seasonal low
+SEPTEMBER
+Typical Antarctic sea ice maximum / seasonal high
+The prototype should make switching between February and September extremely easy.
+For example:
+February -------- timeline -------- September
+Include:
+year selector
+month selector
+timeline slider
+previous / next controls
+play animation button
+Potential design:
+[2017 ▼]   FEB --------●---------------- SEP   [▶]
+or:
+February 2017 | September 2017
+The user should also be able to compare two periods.
+Example:
+COMPARE:
+February 2017
+vs
+September 2017
+Use placeholder years such as 2017 and 2023.
+Do not claim any synthetic values are real observations.
+Clearly label fake numbers as DEMO / SYNTHETIC DATA where appropriate.
+==================================================
+5. FILTERING
+Include an intuitive filter system.
+Possible filters:
+Year
+Month
+Season
+Environmental variable
+Sea ice concentration range
+Region
+Model
+Cluster
+Dataset
+Avoid clutter.
+Filters could appear in:
+a collapsible left panel
+top filter bar
+map control drawer
+The user should be able to quickly understand which filters are currently active.
+Use filter chips where appropriate.
+Example:
+Active:
+[2023 ×] [September ×] [Wind Speed ×]
+==================================================
+6. DATA HIGHLIGHTING
+The user must be able to highlight different data types or areas.
+Prototype interactions such as:
+click an environmental variable
+hover over the map
+click a region
+highlight a cluster
+highlight a marginal ice zone section
+When something is selected, show a contextual information panel.
+Example:
+SELECTED REGION
+East Antarctica
+Sea Ice Concentration
+72%
+Surface Temperature
+-18.4 °C
+Wind Speed
+14.3 m/s
+Cluster
+Cluster 2
+Again, use synthetic numbers.
+==================================================
+7. DATASET COMPARISON
+The dashboard must allow users to compare different datasets / variables.
+Create a dedicated comparison interface.
+The user should be able to select:
+Variable A
+vs
+Variable B
+For example:
+Sea Ice Concentration
+vs
+Sea Surface Temperature
+or:
+Sea Ice Concentration
+vs
+Wind Speed
+Then show an appropriate comparison visualisation.
+Possible visuals:
+scatter plot
+line chart
+dual timeline
+correlation matrix
+small multiples
+Do NOT put all of these on one page by default.
+Make the comparison experience focused.
+For example:
+COMPARE VARIABLES
+[Sea Ice Concentration ▼]
+versus
+[Wind Speed ▼]
+Correlation
+-0.42
+[Scatter plot]
+Use DEMO DATA only.
+==================================================
+8. MACHINE LEARNING RESULTS
+The project includes a machine learning component.
+The initial prototype uses K-means clustering to identify possible patterns between sea ice and environmental/topographical variables.
+If useful patterns are identified, other machine learning methods may later be investigated, including:
+Random Forest
+Support Vector Machines
+Do NOT need to implement real machine learning.
+Instead build a polished interface showing how model outputs WOULD appear.
+Create a section called something like:
+MODEL INSIGHTS
+or
+ML ANALYSIS
+Potential content:
+Model
+K-Means Clustering
+Status
+Analysis Complete
+Clusters
+4 identified
+Variables analysed
+3
+Example variables:
+Sea Ice Concentration
+Surface Temperature
+Wind Speed
+Include synthetic metrics.
+Potential interface:
+MODEL
+K-Means
+Clusters:
+4
+Silhouette Score:
+0.61 DEMO
+Dataset:
+September 2023
+Then visualise the clusters on the Antarctic map.
+Give each cluster:
+colour
+number
+optional pattern / border
+Do not rely only on colour.
+When clicking a cluster, show:
+CLUSTER 2
+Primary characteristics:
+Lower sea ice concentration
+Higher wind speed
+Warmer surface temperature
+These descriptions are placeholders only.
+==================================================
+9. MODEL / DASHBOARD INTEGRATION
+The final project intends for model outputs to automatically appear within the dashboard.
+Represent this concept visually.
+For example:
+DATA
+↓
+MODEL ANALYSIS
+↓
+DASHBOARD
+However, do NOT turn the main dashboard into a technical workflow diagram.
+Instead make the experience feel integrated.
+For example have:
+Dataset:
+September 2023
+Model:
+K-Means
+Status:
+✓ Results loaded
+The model's clusters should appear directly as a selectable map layer.
+==================================================
+10. ENVIRONMENTAL VARIABLES
+The project should support AT LEAST THREE environmental data types.
+For the prototype, use:
+Sea Surface Temperature
+Wind Speed
+Surface Air Temperature
+You may additionally include:
+Atmospheric Pressure
+Ocean Current
+Bathymetry
+But do not overcrowd the interface.
+==================================================
+11. ACCESSIBILITY
+Accessibility is a major requirement.
+The interface must NOT discriminate against users with disabilities such as colour blindness.
+Follow WCAG-inspired principles.
+Requirements:
+good text contrast
+readable typography
+sufficient font sizes
+visible keyboard focus states
+don't communicate meaning using colour alone
+icons + labels
+line styles / patterns where appropriate
+colour-blind-conscious data visualisation
+clear hover and selected states
+large enough click targets
+understandable labels
+Avoid:
+red = bad
+green = good
+unless additional symbols/text communicate the same information.
+Do not use extremely pale text.
+==================================================
+DESIGN DIRECTION
+I want this to look VERY polished.
+DESIGN STYLE:
+Modern
+Scientific
+Clean
+Premium
+Minimal
+Data-rich without feeling cluttered
+Professional
+University research quality
+Geospatial
+Calm
+Avoid:
+excessive gradients
+neon cyberpunk colours
+glassmorphism everywhere
+huge rounded SaaS cards
+childish illustrations
+overly playful components
+excessive shadows
+overly blue corporate dashboard design
+tiny text
+dense Excel-style tables
+==================================================
+COLOUR PALETTE
+Use a sophisticated Antarctic-inspired palette.
+Main background:
+very light cool grey / almost white
+Example:
+#F5F7F9
+#F7F9FB
+Primary text:
+deep navy / charcoal
+Example:
+#17212B
+Secondary text:
+slate grey
+Primary accent:
+deep polar blue
+Secondary accent:
+muted cyan / ice blue
+Potential additional scientific data colours:
+violet
+orange
+teal
+magenta
+BUT ensure they are colour-blind conscious.
+The Antarctic map should visually stand out.
+Example map styling:
+Land:
+off-white / pale grey
+Ocean:
+very pale blue-grey
+Sea ice:
+white / icy blue
+Marginal Ice Zone:
+strong navy/cyan outline
+Environmental overlay:
+semi-transparent scientific heatmap
+==================================================
+TYPOGRAPHY
+Use a clean modern sans-serif.
+Examples:
+Inter
+IBM Plex Sans
+DM Sans
+Manrope
+Geist
+Prefer Inter or IBM Plex Sans because this is a scientific research interface.
+Typography hierarchy:
+Page title:
+24–28px
+Section heading:
+16–18px
+Body:
+13–15px
+Metric:
+24–30px
+Labels:
+11–13px
+Avoid gigantic SaaS-style headings.
+==================================================
+GENERAL PAGE STRUCTURE
+Use a desktop-first layout.
+Target screen:
+approximately 1440 × 900
+Suggested shell:
+LEFT SIDEBAR
+240px
+TOP HEADER
+64px
+MAIN CONTENT AREA
+The sidebar should be dark OR very subtly separated from the main workspace.
+Do not make it visually dominant.
+==================================================
+SIDEBAR
+Create a logo / project mark at the top.
+Example:
+ANTARCTIC
+SEA ICE LAB
+or
+SEA ICE
+RESEARCH DASHBOARD
+Do not invent a commercial brand.
+Navigation:
+Overview
+Map Explorer
+Compare
+Model Insights
+Then perhaps:
+Data
+About
+Use simple line icons.
+Current section should be obvious.
+At bottom:
+Data Status
+Demo Dataset
+==================================================
+TOP HEADER
+Left:
+Antarctic Sea Ice Explorer
+small subtitle:
+Environmental & Machine Learning Analysis
+Right:
+Dataset status
+Last updated
+Help
+Accessibility control / settings
+Potential:
+Demo Data
+● Synthetic Dataset
+This is useful because no real client data should be sent to this prototype.
+==================================================
+VIEW 1:
+OVERVIEW
+This should be the home dashboard.
+Structure:
+TITLE
+Antarctic Sea Ice Overview
+Subtitle:
+Explore seasonal sea ice conditions and relationships with environmental variables.
+Top right:
+Year selector
+Month selector
+Example:
+[2023 ▼] [September ▼]
+TOP METRICS
+Use 3–4 compact metric cards.
+Examples:
+SEA ICE EXTENT
+17.2 M km²
+DEMO
+MARGINAL ICE ZONE
+1.8 M km²
+DEMO
+MODEL CLUSTERS
+4
+VARIABLES ANALYSED
+3
+Again:
+Clearly tag synthetic data where necessary.
+Do not make cards oversized.
+MAIN GRID
+LEFT approximately 70%
+Large Antarctic Map
+RIGHT approximately 30%
+“Layers & Analysis” panel
+MAP
+Large circular / polar Antarctica map.
+Top-left controls:
+/ -
+reset
+selection
+Top-right:
+Map style
+Bottom:
+timeline
+Bottom-left:
+legend
+RIGHT PANEL
+Title:
+Layers
+Toggle list:
+Sea Ice Concentration
+Marginal Ice Zone
+Sea Surface Temperature
+Wind Speed
+Surface Air Temperature
+ML Clusters
+Below:
+Selected Region
+If nothing selected:
+“Select an area of the map to inspect environmental conditions.”
+BOTTOM SECTION
+Two panels:
+LEFT:
+Seasonal Sea Ice Trend
+Small elegant line graph showing monthly synthetic sea ice values.
+Clearly emphasize:
+FEB LOW
+SEP PEAK
+RIGHT:
+Model Insight
+Example:
+“K-Means identified 4 spatial clusters across the selected environmental variables.”
+Button:
+View model analysis →
+==================================================
+VIEW 2:
+MAP EXPLORER
+This should be an almost full-screen scientific map interface.
+Make the map approximately 75% of the usable space.
+LEFT FLOATING PANEL:
+DATA LAYERS
+[x] Sea Ice Concentration
+[x] Marginal Ice Zone
+[ ] Surface Temperature
+[ ] Wind Speed
+[ ] Air Temperature
+[ ] ML Clusters
+Each has:
+icon
+label
+visibility toggle
+Optional:
+opacity slider appears after expanding a layer.
+RIGHT FLOATING PANEL:
+INSPECT
+Location:
+68.4°S, 42.1°E
+Region:
+East Antarctica
+Sea Ice:
+67%
+Surface Temperature:
+-16°C
+Wind:
+12.1 m/s
+Cluster:
+2
+All demo data.
+BOTTOM FLOATING BAR:
+TIME
+February
+————●————————
+September
+[◀] [▶ PLAY] [▶]
+Year:
+2023
+Add an optional:
+COMPARE
+toggle.
+When Compare is active, split the map vertically:
+LEFT
+February
+RIGHT
+September
+Use a draggable comparison slider if visually feasible.
+This could be one of the best visual features.
+==================================================
+VIEW 3:
+COMPARE
+This is where researchers investigate relationships.
+Top:
+COMPARE VARIABLES
+[Sea Ice Concentration ▼]
+VERSUS
+[Sea Surface Temperature ▼]
+Year:
+[2023]
+Month:
+[September]
+Show:
+Correlation
+-0.42
+DEMO
+Sample Count
+1,248
+DEMO
+Main graph:
+large scatter plot
+X:
+Sea Surface Temperature
+Y:
+Sea Ice Concentration
+Points could optionally be grouped by cluster.
+Below:
+SPATIAL COMPARISON
+Two smaller Antarctic maps side-by-side:
+Sea Ice Concentration
+vs
+Sea Surface Temperature
+Use consistent geography.
+Include:
+“Interpretation”
+Example placeholder:
+“Lower sea ice concentration appears more common in areas with comparatively warmer surface temperatures within this synthetic demonstration dataset.”
+Label:
+DEMO INTERPRETATION
+Do NOT imply scientific validity.
+==================================================
+VIEW 4:
+MODEL INSIGHTS
+Header:
+Machine Learning Analysis
+Subtitle:
+Explore patterns identified between Antarctic sea ice and environmental variables.
+MODEL CONTROL
+Model:
+[K-Means ▼]
+Dataset:
+[September 2023 ▼]
+Variables:
+3 selected
+Status:
+Analysis complete
+PRIMARY MAP
+Antarctic map with clusters visualised.
+Cluster boundaries should be distinct.
+Do not communicate cluster solely using colour.
+Example:
+Cluster 1 — solid
+Cluster 2 — diagonal texture
+Cluster 3 — dotted boundary
+Cluster 4 — alternate line pattern
+RIGHT PANEL
+Cluster Summary
+CLUSTER 1
+34% of observations
+High sea ice concentration
+Low temperature
+CLUSTER 2
+26%
+Lower concentration
+Higher wind speed
+CLUSTER 3
+22%
+etc.
+CLUSTER 4
+18%
+These are synthetic placeholders.
+LOWER SECTION
+Feature Summary
+Use elegant horizontal bars / plots showing relative contribution or characteristic differences.
+Because K-Means itself does not produce normal feature importance, do NOT incorrectly label this “feature importance” for K-Means.
+Instead call it something like:
+Cluster Variable Profile
+For future supervised models such as Random Forest, a separate feature-importance visual could later be introduced.
+Add a model selector indicating potential future support:
+K-Means
+Random Forest
+Support Vector Machine
+K-Means should be active.
+Random Forest / SVM can be marked:
+Future Model
+or
+Not Yet Available
+==================================================
+DATA PANEL / UPLOAD CONCEPT
+Because the eventual system may use project datasets, visually prototype a Data section.
+DO NOT process real files in this prototype.
+Create a mock interface:
+DATASETS
+Sea Ice Dataset
+Loaded
+Environmental Dataset
+Loaded
+Topographic Dataset
+Loaded
+Model Output
+Loaded
+Allow mock buttons:
+Replace Dataset
+View Metadata
+Add warning:
+“Prototype environment — do not upload confidential research data.”
+Again, do not actually require any real data.
+==================================================
+MAP INTERACTION DETAILS
+Hovering over a geographic area should show a compact tooltip.
+Example:
+68.2°S, 40.8°E
+Sea Ice
+72%
+Temperature
+−18.2°C
+Wind
+14.1 m/s
+Cluster
+2
+Clicking it should lock that location and update the Inspect panel.
+==================================================
+LEGENDS
+Legends should update based on visible layers.
+Example:
+SEA ICE CONCENTRATION
+0%
+25%
+50%
+75%
+100%
+For wind speed:
+0
+10
+20
+30 m/s
+Do not make users guess what colours mean.
+==================================================
+INTERACTION POLISH
+Use subtle transitions.
+Examples:
+150–250ms fade
+panel expand
+layer toggle
+hover state
+map selection
+Avoid excessive animation.
+When switching month:
+smoothly animate chart transitions.
+When enabling a layer:
+fade it onto map.
+==================================================
+EMPTY STATES
+Design good empty states.
+Example:
+“No region selected”
+Select an area of Antarctica to inspect local environmental conditions.
+No huge illustrations.
+Use simple iconography.
+==================================================
+LOADING STATES
+Show elegant skeleton loading states for:
+Map
+Graph
+Model analysis
+Example:
+“Loading synthetic model results…”
+==================================================
+ERROR STATES
+Prototype one clean error state.
+Example:
+Dataset unavailable
+The selected environmental layer could not be loaded.
+[Retry]
+==================================================
+TOOLTIPS
+Because many users may not be climate researchers, provide subtle information icons.
+Example:
+Marginal Ice Zone ⓘ
+Tooltip:
+“The transition region between open ocean and consolidated sea ice.”
+Keep explanations concise.
+==================================================
+ACCESSIBILITY FEATURE
+Add an accessibility / display option.
+For example:
+Display
+○ Standard
+○ High Contrast
+○ Colour Vision Safe
+Do not overbuild this.
+The default interface itself must already be accessible.
+==================================================
+RESPONSIVE DESIGN
+The primary design is desktop research use.
+However, make it responsive enough for tablets.
+On smaller screens:
+Sidebar collapses into icons
+Panels stack
+Map remains large
+Right analysis panel becomes drawer
+Do NOT prioritise mobile phone use at the expense of desktop quality.
+==================================================
+VISUAL DETAILS I WANT
+Use:
+thin 1px borders
+subtle shadows only when necessary
+medium border radius approximately 8–12px
+lots of breathing room
+clear grouping
+highly consistent spacing
+precise alignment
+iconography
+good hover states
+professional legends
+elegant dropdowns
+compact controls
+good scientific charts
+Avoid:
+massive cards
+pill-shaped everything
+excessive rounded corners
+random colourful graphs
+decorative blobs
+excessive gradients
+generic stock imagery
+hero banners
+==================================================
+ANTARCTICA MAP VISUAL
+This is extremely important.
+Make the Antarctic map beautiful.
+Use a polar view centred directly over Antarctica.
+It should feel almost like satellite/geospatial analysis software.
+Include surrounding longitude markers if visually appropriate.
+Potential design:
+dark ocean
+very light Antarctic land
+icy sea ice field
+blue Marginal Ice Zone boundary
+OR
+light ocean
+white Antarctic land
+blue/cyan data overlay
+Choose whichever produces the strongest professional research design.
+The map must NOT look like a generic Google Maps map.
+==================================================
+SCIENTIFIC CREDIBILITY
+Include units consistently.
+Examples:
+Sea Ice Extent
+million km²
+Temperature
+°C
+Wind Speed
+m/s
+Latitude
+°S
+Longitude
+°E
+Clearly label legends.
+Use proper minus symbols where possible.
+==================================================
+IMPORTANT DATA DISCLAIMER
+Somewhere unobtrusive but clearly visible include:
+“Prototype interface — values shown are synthetic and for design demonstration only.”
+This can appear in the header or bottom.
+Do not plaster this warning everywhere.
+==================================================
+KEY USER FLOW
+The dashboard should support this user journey:
+User opens Overview.
+Immediately sees Antarctic sea ice conditions for a selected date.
+User changes from September to February.
+Map and metrics update.
+User activates Wind Speed layer.
+User zooms into the Marginal Ice Zone.
+User clicks a location.
+Local sea ice and environmental conditions appear.
+User chooses Compare.
+User compares sea ice concentration against wind speed.
+User opens Model Insights.
+User sees K-Means clusters displayed geographically.
+User selects Cluster 2.
+Dashboard shows characteristics of that cluster.
+This flow should feel seamless.
+==================================================
+DESIGN PRIORITY
+Use this priority order:
+Visual design
+Information hierarchy
+Usability
+Map experience
+Accessibility
+Interaction design
+Scientific credibility
+Technical functionality
+I would rather have an extremely polished mock interface with simulated interactions than an ugly but technically complex dashboard.
+==================================================
+IMPLEMENTATION REQUEST
+Create this as an interactive front-end prototype that I can immediately preview.
+Use whatever front-end approach is best for creating a polished prototype in your environment.
+Prefer reusable UI components.
+Use synthetic data arrays for graphs and numbers.
+Do NOT:
+connect to real APIs
+ask for credentials
+upload files externally
+use client research data
+scrape datasets
+build a backend
+build real machine learning
+optimise for production
+create unnecessary architecture
+If an actual polar geospatial map is difficult to implement, build a visually convincing Antarctic map mock/projection that allows us to judge the UI.
+I care primarily about what the dashboard LOOKS LIKE.
+==================================================
+FINAL QUALITY CHECK
+Before finishing, evaluate the design against these questions:
+Does Antarctica immediately dominate the interface?
+Can I see what month/year I am viewing?
+Can I quickly switch between February and September?
+Can I toggle at least three environmental/data layers?
+Can I turn the Marginal Ice Zone boundary on/off?
+Can I zoom into changes in the ice edge?
+Can I inspect a selected region?
+Can I compare two environmental variables?
+Can I compare different time periods?
+Can I see machine learning clusters?
+Can I understand what model is being used?
+Can a non-technical stakeholder understand the basic interface?
+Does the interface remain usable for someone with colour vision deficiency?
+Does the dashboard avoid relying only on colour?
+Does it look like professional scientific software?
+Does it avoid looking like a generic admin dashboard?
+Is the visual hierarchy obvious?
+Is synthetic/demo data clearly identified?
+If any answer is NO, revise the design before presenting the prototype.
+==================================================
+IMPORTANT CREATIVE INSTRUCTION
+Do not give me the safest, most generic dashboard possible.
+Take strong design decisions.
+I want something that could realistically be shown during a university stakeholder presentation and make the audience think:
+“This looks like an actual scientific research platform.”
+Make the Antarctic map and timeline the visual identity of the product.
+Focus especially on:
+polished spacing
+typography
+map presentation
+layer controls
+timeline
+seasonal comparison
+beautiful chart styling
+scientific legends
+model results
+information hierarchy
+Build the full visual prototype now.
