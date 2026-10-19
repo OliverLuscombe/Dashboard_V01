@@ -6,13 +6,13 @@ import logging
 from pathlib import PurePath
 from typing import Any, TypedDict
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, insert, select
 from app.models import UploadedDataset, UploadedDatasetRow
 
 
 MAX_BYTES = 5 * 1024 * 1024
-MAX_ROWS = 10000
-MAX_COLUMNS = 100
+MAX_ROWS = 100000
+MAX_COLUMNS = 10
 MAX_CELL = 32768
 PAGE_SIZE = 25
 
@@ -79,7 +79,7 @@ class UploadedData(rx.State):
         if PurePath(filename).suffix.lower() != ".csv":
             raise ValueError("Choose a file with a .csv extension.")
         if len(data) > MAX_BYTES:
-            raise ValueError("This CSV exceeds the 5 MB limit.")
+            raise ValueError("This CSV exceeds the 5 MB per-file limit.")
         if not data:
             raise ValueError("The file is empty. Include a header row.")
         try:
@@ -97,7 +97,7 @@ class UploadedData(rx.State):
                     "Every column needs a nonempty header in the first row."
                 )
             if len(headers) > MAX_COLUMNS:
-                raise ValueError("Use at most 100 columns per CSV.")
+                raise ValueError("Use at most 10 columns per CSV.")
             if len(set(name.strip() for name in headers)) != len(headers):
                 raise ValueError(
                     "Column headers must be unique, including after trimming whitespace."
@@ -109,7 +109,7 @@ class UploadedData(rx.State):
             records: list[list[str]] = []
             for index, cells in enumerate(reader, start=1):
                 if index > MAX_ROWS:
-                    raise ValueError("Use at most 10,000 data rows per CSV.")
+                    raise ValueError("Use at most 100,000 data rows per CSV.")
                 if len(cells) != len(headers):
                     raise ValueError(
                         f"Data row {index} has {len(cells)} fields; expected {len(headers)}. Check blank lines, commas and quoting."
@@ -255,18 +255,21 @@ class UploadedData(rx.State):
                     session.add(dataset)
                     session.flush()
                     new_id = dataset.id
-                    session.add_all(
-                        [
-                            UploadedDatasetRow(
-                                dataset_id=new_id,
-                                row_position=i,
-                                cell_values_json=json.dumps(
-                                    cells, ensure_ascii=True
-                                ),
-                            )
-                            for i, cells in enumerate(records)
-                        ]
-                    )
+                    for batch_start in range(0, len(records), 1000):
+                        batch = records[batch_start : batch_start + 1000]
+                        session.execute(
+                            insert(UploadedDatasetRow.__table__),
+                            [
+                                {
+                                    "dataset_id": new_id,
+                                    "row_position": batch_start + offset,
+                                    "cell_values_json": json.dumps(
+                                        cells, ensure_ascii=True
+                                    ),
+                                }
+                                for offset, cells in enumerate(batch)
+                            ],
+                        )
             committed = True
             self.selected_id = new_id
             self.page_index = 0
@@ -349,6 +352,10 @@ class UploadedData(rx.State):
     def add_row(self):
         self.error = ""
         self.success = ""
+        if self.row_count >= MAX_ROWS:
+            self._clear_editor()
+            self.error = "This dataset has reached the 100,000-row limit. Delete a row before adding another."
+            return
         self._clear_editor()
         self.editor_mode = "add"
         self.editor_fields = [
@@ -409,7 +416,7 @@ class UploadedData(rx.State):
                     if self.editor_mode == "add":
                         if dataset.row_count >= MAX_ROWS:
                             raise ValueError(
-                                "This dataset has reached the 10,000-row limit."
+                                "This dataset has reached the 100,000-row limit."
                             )
                         last_position = session.scalar(
                             select(

@@ -30,7 +30,7 @@ def import_zone() -> rx.Component:
                     class_name="text-xs font-medium text-[#245f7e]",
                 ),
                 rx.el.span(
-                    "One .csv · UTF-8 · up to 5 MB",
+                    "One .csv · UTF-8 · max 5 MB per file",
                     class_name="text-[10px] text-slate-500",
                 ),
                 class_name="flex flex-col items-center gap-2 px-3 py-5",
@@ -79,7 +79,7 @@ def import_zone() -> rx.Component:
             class_name="mt-3 flex flex-wrap gap-2",
         ),
         rx.el.p(
-            "Up to 10,000 rows and 100 columns. Unique nonempty headers; equal field counts. Header-only CSVs are supported. Values remain strings, including dates, formulas and leading zeros.",
+            "Up to 100,000 rows and 10 columns per CSV; the 5 MB per-file limit still applies. Unique nonempty headers; equal field counts. Header-only CSVs are supported. Values remain strings, including dates, formulas and leading zeros.",
             class_name="mt-3 text-[10px] leading-relaxed text-slate-500",
         ),
         rx.el.p(
@@ -478,7 +478,7 @@ def dataset_editor() -> rx.Component:
                             rx.icon("plus", class_name="h-3.5 w-3.5"),
                             "Add row",
                             on_click=D.add_row,
-                            disabled=(D.row_count >= 10000)
+                            disabled=(D.row_count >= 100000)
                             | D.loading
                             | D.importing,
                             class_name=PRIMARY,
@@ -500,9 +500,9 @@ def dataset_editor() -> rx.Component:
                         class_name="mt-4 flex flex-wrap gap-2",
                     ),
                     rx.cond(
-                        D.row_count >= 10000,
+                        D.row_count >= 100000,
                         rx.el.p(
-                            "10,000-row limit reached. Delete a row before adding another.",
+                            "100,000-row limit reached. Delete a row before adding another.",
                             class_name="mt-2 text-[11px] text-slate-500",
                         ),
                     ),

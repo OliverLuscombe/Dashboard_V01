@@ -1194,7 +1194,7 @@ def about() -> rx.Component:
                     class_name="text-lg font-medium text-slate-800",
                 ),
                 rx.el.p(
-                    "The Data tab accepts UTF-8 CSVs up to 5 MB, with up to 10,000 rows and 100 columns. Import a file, select a saved dataset, then preview, edit, add or delete rows and rename or delete datasets. Changes persist after refresh; the four synthetic fixture cards remain separate UI demos.",
+                    "The Data tab accepts UTF-8 CSVs with up to 100,000 rows and 10 columns; the existing 5 MB per-file limit still applies. Import a file, select a saved dataset, then preview, edit, add or delete rows and rename or delete datasets. Changes persist after refresh; the four synthetic fixture cards remain separate UI demos.",
                     class_name="mt-3 text-sm leading-7 text-slate-600",
                 ),
                 rx.el.p(
