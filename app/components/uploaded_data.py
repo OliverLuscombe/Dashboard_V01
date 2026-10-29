@@ -4,7 +4,9 @@ from app.states.uploaded_data import (
     DatasetSummary,
     PreviewRow,
     EditorField,
+    MAX_ROWS,
 )
+from app.components.overview_source import active_source, source_configuration
 
 
 BUTTON = "inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-sky-800 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -30,7 +32,7 @@ def import_zone() -> rx.Component:
                     class_name="text-xs font-medium text-[#245f7e]",
                 ),
                 rx.el.span(
-                    "One .csv · UTF-8 · max 5 MB per file",
+                    "One .csv · UTF-8 · max 20 MB per file",
                     class_name="text-[10px] text-slate-500",
                 ),
                 class_name="flex flex-col items-center gap-2 px-3 py-5",
@@ -79,11 +81,11 @@ def import_zone() -> rx.Component:
             class_name="mt-3 flex flex-wrap gap-2",
         ),
         rx.el.p(
-            "Up to 100,000 rows and 10 columns per CSV; the 5 MB per-file limit still applies. Unique nonempty headers; equal field counts. Header-only CSVs are supported. Values remain strings, including dates, formulas and leading zeros.",
+            "Up to 120,000 rows and 10 columns per CSV; the 20 MB per-file limit still applies. Unique nonempty headers; equal field counts. Header-only CSVs are supported. Values remain strings, including dates, formulas and leading zeros.",
             class_name="mt-3 text-[10px] leading-relaxed text-slate-500",
         ),
         rx.el.p(
-            "Parsed contents are saved, not the raw file. Importing never changes maps, charts or model results.",
+            "Parsed contents are saved, not the raw file. A CSV is designated for Overview only when actively selected and applied below; importing alone does not select it. Other demo pages remain synthetic.",
             class_name="mt-2 text-[10px] leading-relaxed text-slate-500",
         ),
         class_name="border-b border-slate-200 p-4",
@@ -478,7 +480,7 @@ def dataset_editor() -> rx.Component:
                             rx.icon("plus", class_name="h-3.5 w-3.5"),
                             "Add row",
                             on_click=D.add_row,
-                            disabled=(D.row_count >= 100000)
+                            disabled=(D.row_count >= MAX_ROWS)
                             | D.loading
                             | D.importing,
                             class_name=PRIMARY,
@@ -500,9 +502,9 @@ def dataset_editor() -> rx.Component:
                         class_name="mt-4 flex flex-wrap gap-2",
                     ),
                     rx.cond(
-                        D.row_count >= 100000,
+                        D.row_count >= MAX_ROWS,
                         rx.el.p(
-                            "100,000-row limit reached. Delete a row before adding another.",
+                            "120,000-row limit reached. Delete a row before adding another.",
                             class_name="mt-2 text-[11px] text-slate-500",
                         ),
                     ),
@@ -537,6 +539,7 @@ def dataset_editor() -> rx.Component:
                     ),
                     class_name="border-b border-slate-200 p-4",
                 ),
+                source_configuration(),
                 preview(),
                 row_editor(),
                 delete_confirmation(),
@@ -573,7 +576,7 @@ def uploaded_workspace() -> rx.Component:
                     class_name="text-sm font-medium text-[#172e40]",
                 ),
                 rx.el.p(
-                    "Uploaded datasets and edits are stored and visible to everyone using this prototype. There is no sign-in or private access. Do not upload confidential or personal data. Overview, Map, Compare and Model Insights continue to use synthetic fixtures only.",
+                    "Uploaded datasets and edits are stored and visible to everyone using this prototype. There is no sign-in or private access. Do not upload confidential or personal data. CSV only changes the designated Overview source when actively selected and applied. Other demo pages remain synthetic. This phase saves the configuration; Overview visuals are not yet replaced.",
                     class_name="mt-1 text-xs leading-relaxed text-slate-600",
                 ),
             ),
@@ -597,6 +600,7 @@ def uploaded_workspace() -> rx.Component:
                 class_name="mb-4 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-xs leading-relaxed text-green-700",
             ),
         ),
+        active_source(),
         rx.el.div(
             catalogue(),
             dataset_editor(),

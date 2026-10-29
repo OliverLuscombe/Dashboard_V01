@@ -2,6 +2,7 @@ import reflex as rx
 from datetime import UTC, datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -51,6 +52,12 @@ class UploadedDataset(Base):
     )
     status: Mapped[str] = mapped_column(
         Text, default="pending", server_default=text("'pending'")
+    )
+    overview_active: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
+    overview_mapping_json: Mapped[str] = mapped_column(
+        Text, default="{}", server_default=text("'{}'")
     )
 
 

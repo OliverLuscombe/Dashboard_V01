@@ -190,7 +190,7 @@ def title() -> rx.Component:
                     ),
                     (
                         "Data",
-                        "Import, preview and edit shared CSV records — separate from the synthetic scientific demos.",
+                        "Import, preview and edit shared CSVs, then explicitly configure an Overview source; other demo pages remain synthetic.",
                     ),
                     "Modelling Antarctic Sea Ice with Supervised Machine Learning and Satellite Data",
                 ),
@@ -1183,7 +1183,7 @@ def about() -> rx.Component:
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 rx.el.p(
-                    "All scientific values, geometries, correlations and model outputs in Overview, Map Explorer, Compare and Model Insights are synthetic. Uploaded CSVs do not feed these calculations. No satellite APIs or machine learning execution are connected. This is not production software or evidence of climate trends.",
+                    "Current scientific visuals in Overview, Map Explorer, Compare and Model Insights remain synthetic. The Data tab can persist an explicitly selected CSV source and column mapping for Overview; rendering its uploaded observations is not enabled in this phase. Other demo pages remain synthetic. No satellite APIs or machine learning execution are connected. This is not production software or evidence of climate trends.",
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 class_name="border-t border-slate-200 mt-8 pt-6",
@@ -1194,11 +1194,15 @@ def about() -> rx.Component:
                     class_name="text-lg font-medium text-slate-800",
                 ),
                 rx.el.p(
-                    "The Data tab accepts UTF-8 CSVs with up to 100,000 rows and 10 columns; the existing 5 MB per-file limit still applies. Import a file, select a saved dataset, then preview, edit, add or delete rows and rename or delete datasets. Changes persist after refresh; the four synthetic fixture cards remain separate UI demos.",
+                    "The Data tab accepts UTF-8 CSVs with up to 120,000 data rows and 10 columns, with a 20 MB (20 × 1,024 × 1,024 bytes) per-file cap. A full 104,912-row (332 × 316) grid fits within the row limit. Import, preview, edit, add or delete rows and rename or delete datasets. Select any saved dataset to map source columns and explicitly apply or remove its Overview source; only one dataset is active at a time. Changes and mappings persist after refresh; the four synthetic fixture cards remain separate UI demos.",
                     class_name="mt-3 text-sm leading-7 text-slate-600",
                 ),
                 rx.el.p(
                     "This is a shared prototype workspace with no authentication or private permissions. Everyone using the prototype can view and edit saved datasets. Upload only non-confidential CSVs, never confidential research or personal data. CSV contents are parsed within the app, not uploaded to an external service. Values are stored as strings; uploads are not validated as scientific observations.",
+                    class_name="mt-3 text-sm leading-7 text-slate-600",
+                ),
+                rx.el.p(
+                    "Overview positioning requires mapped x_coordinate and y_coordinate columns, or intact zero-based row positions in exactly 104,912 rows. Row-order generation uses x = row_position % 316 + 1 and y = 332 − row_position // 316. This is pixel-grid positioning, not a real latitude/longitude stereographic transformation. Latitude, longitude, measurements and dates are optional metadata; absent values are not invented. Mapping does not validate scientific units or measurement quality.",
                     class_name="mt-3 text-sm leading-7 text-slate-600",
                 ),
                 action("Open CSV workspace", "database", S.navigate("Data")),
