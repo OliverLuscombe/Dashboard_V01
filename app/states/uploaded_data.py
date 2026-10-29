@@ -587,7 +587,7 @@ class UploadedData(rx.State):
                 self.source_success = (
                     "Overview source removed; its saved mapping is retained for reuse."
                     if remove
-                    else "Overview source and mapping saved. Rendering uploaded observations is not enabled in this phase; the current Overview visuals remain synthetic."
+                    else "Overview source and mapping saved. Return to Overview to view the mapped CSV pixel grid. Overview summaries and seasonal analysis remain unavailable for uploaded sources; other demo pages remain synthetic."
                 )
             yield UploadedData.load_catalogue
         except Exception as e:

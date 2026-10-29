@@ -130,6 +130,10 @@ class Explorer(rx.State):
             from app.states.uploaded_data import UploadedData
 
             return UploadedData.load_catalogue
+        if page == "Overview":
+            from app.states.overview_grid import OverviewGrid
+
+            return OverviewGrid.refresh
 
     @rx.event
     def set_month(self, value: int):

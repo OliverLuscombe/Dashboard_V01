@@ -2,6 +2,8 @@ import reflex as rx
 import reflex_xy as xy
 from app.states.explorer import Explorer as S
 from app.components.uploaded_data import uploaded_workspace
+from app.components.overview_grid import uploaded_overview
+from app.states.overview_grid import OverviewGrid as G
 
 
 BUTTON = "inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-sky-800 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
@@ -133,10 +135,18 @@ def header() -> rx.Component:
         rx.el.div(
             rx.el.span(
                 rx.el.span(class_name="h-1.5 w-1.5 rounded-full bg-teal-600"),
-                "Synthetic dataset",
+                rx.cond(
+                    (S.page == "Overview") & (G.status != "demo"),
+                    "Uploaded grid · no derived summaries",
+                    "Synthetic dataset",
+                ),
                 class_name="hidden sm:flex items-center gap-2 text-xs text-slate-600",
             ),
             rx.el.div(class_name="h-6 border-l border-slate-200"),
+            rx.cond(
+                S.page == "Overview",
+                action("Refresh source", "refresh-cw", G.refresh),
+            ),
             action("Display", "sliders-horizontal", S.show_display),
             action("Help", "circle-help", S.navigate("About")),
             class_name="flex items-center gap-4",
@@ -174,7 +184,11 @@ def title() -> rx.Component:
                     S.page,
                     (
                         "Overview",
-                        "Explore seasonal change, environmental conditions and spatial patterns.",
+                        rx.cond(
+                            G.status != "demo",
+                            "Inspect mapped CSV readings on their pixel grid; other demo pages remain synthetic.",
+                            "Explore seasonal change, environmental conditions and spatial patterns.",
+                        ),
                     ),
                     (
                         "Map Explorer",
@@ -810,6 +824,14 @@ def trend() -> rx.Component:
 
 
 def overview() -> rx.Component:
+    return rx.cond(
+        (S.page == "Overview") & (G.status != "demo"),
+        uploaded_overview(),
+        demo_overview(),
+    )
+
+
+def demo_overview() -> rx.Component:
     return rx.el.div(
         metrics(),
         filters(),
@@ -1183,7 +1205,7 @@ def about() -> rx.Component:
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 rx.el.p(
-                    "Current scientific visuals in Overview, Map Explorer, Compare and Model Insights remain synthetic. The Data tab can persist an explicitly selected CSV source and column mapping for Overview; rendering its uploaded observations is not enabled in this phase. Other demo pages remain synthetic. No satellite APIs or machine learning execution are connected. This is not production software or evidence of climate trends.",
+                    "Overview renders the explicitly selected uploaded CSV as a 316-column × 332-row pixel grid, with only mapped measurements and saved observations in its inspector. It is not a geographic projection. Overview summaries and seasonal analysis are unavailable for uploaded sources; existing period controls do not filter the uploaded grid. Without a selected source, Overview remains the synthetic demo. Map Explorer, Compare and Model Insights remain synthetic. No satellite APIs or machine learning execution are connected. This is not production software or evidence of climate trends.",
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 class_name="border-t border-slate-200 mt-8 pt-6",
@@ -1245,7 +1267,7 @@ def display_options() -> rx.Component:
                 class_name="flex gap-2 flex-wrap",
             ),
             rx.el.p(
-                "Patterns and text labels are always enabled. High contrast strengthens outlines; colour vision safe removes colour from the map.",
+                "Demo maps use patterns and text labels; high contrast strengthens outlines and colour vision safe greyscales the demo SVG. Uploaded pixel grids keep their labelled measurement colours and numeric inspector.",
                 class_name="text-[11px] text-slate-500 w-full",
             ),
             class_name="mb-5 flex flex-wrap items-center justify-between gap-3 border border-slate-200 bg-white rounded-lg p-4 text-slate-700",
@@ -1274,7 +1296,7 @@ def workspace() -> rx.Component:
             ),
             rx.el.footer(
                 rx.icon("flask-conical", class_name="h-3 w-3 shrink-0"),
-                "Prototype — scientific visuals are synthetic. Uploaded CSVs are separate, shared stored records.",
+                "Prototype — uploaded Overview grids show saved CSV readings, not validated scientific observations. Other views are synthetic demos.",
                 rx.el.span(
                     "NOT FOR SCIENTIFIC USE",
                     class_name="hidden lg:block ml-auto text-[8px] tracking-wider",

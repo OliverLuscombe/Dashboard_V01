@@ -86,7 +86,7 @@ def active_source() -> rx.Component:
             class_name="flex flex-wrap items-center justify-between gap-3",
         ),
         rx.el.p(
-            "A CSV is designated for Overview only when you explicitly apply it. Other demo pages remain synthetic. This phase saves the source configuration only: Overview map, metrics and charts still show labelled synthetic demonstrations, not uploaded observations.",
+            "A CSV is designated for Overview only when you explicitly apply it. Return to Overview to render its mapped readings on the 316-column × 332-row pixel grid and inspect saved pixels. Refresh the Overview map after editing data. Uploaded-source summaries and seasonal charts are unavailable; other demo pages remain synthetic.",
             class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
         ),
         rx.cond(

@@ -2,6 +2,7 @@ import reflex as rx
 import app.models  # Register the schema without executing database operations.
 from app.components.workspace import workspace
 from app.states.uploaded_data import UploadedData
+from app.states.overview_grid import OverviewGrid
 
 
 def index() -> rx.Component:
@@ -26,5 +27,5 @@ app.add_page(
     index,
     route="/",
     title="Antarctic Sea Ice Explorer · Research Prototype",
-    on_load=UploadedData.load_catalogue,
+    on_load=[UploadedData.load_catalogue, OverviewGrid.refresh],
 )
