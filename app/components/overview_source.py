@@ -86,7 +86,7 @@ def active_source() -> rx.Component:
             class_name="flex flex-wrap items-center justify-between gap-3",
         ),
         rx.el.p(
-            "A CSV is designated for Overview only when you explicitly apply it. Return to Overview to render its mapped readings on the 316-column × 332-row pixel grid and inspect saved pixels. Refresh the Overview map after editing data. Uploaded-source summaries and seasonal charts are unavailable; other demo pages remain synthetic.",
+            "A CSV is designated for Overview only when you explicitly apply it. Return to Overview to render its mapped readings on the 316-column × 332-row pixel grid and inspect saved pixels. Refresh the Overview map after editing data. Mapped years/months filter the grid, summaries and inspector. Monthly concentration analysis requires mapped month and concentration columns with at least two observed months; other demo pages remain synthetic.",
             class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
         ),
         rx.cond(
@@ -140,7 +140,7 @@ def source_configuration() -> rx.Component:
             class_name="flex flex-wrap items-center gap-3",
         ),
         rx.el.p(
-            "Map your CSV headers to the fields below. Suggestions ignore case, spaces and punctuation; arbitrary headers can be selected manually. Review units before applying. Missing measurements and dates may be Not provided; no values or latitude/longitude metadata will be invented. A CSV has at most 10 columns, so not every field can be present together.",
+            "Map your CSV headers to the fields below. Suggestions ignore case, spaces and punctuation; arbitrary headers can be selected manually. Review units before applying. Year and month must be numeric integers (year 1–9999, month 1–12); invalid mapped dates are excluded. Either date column may be omitted, and no date columns gives an undated snapshot. Missing measurements and dates may be Not provided; no values or latitude/longitude metadata will be invented. A CSV has at most 10 columns, so not every field can be present together.",
             class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
         ),
         rx.el.form(

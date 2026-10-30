@@ -576,7 +576,7 @@ def uploaded_workspace() -> rx.Component:
                     class_name="text-sm font-medium text-[#172e40]",
                 ),
                 rx.el.p(
-                    "Uploaded datasets and edits are stored and visible to everyone using this prototype. There is no sign-in or private access. Do not upload confidential or personal data. CSV only changes the designated Overview source when actively selected and applied. Overview renders the applied source's mapped readings on a pixel grid; refresh the map after edits. Overview summaries and seasonal charts are unavailable for uploaded sources. Other demo pages remain synthetic.",
+                    "Uploaded datasets and edits are stored and visible to everyone using this prototype. There is no sign-in or private access. Do not upload confidential or personal data. CSV only changes the designated Overview source when actively selected and applied. Overview renders the applied source's mapped readings on a pixel grid; refresh the map after edits. Overview cards and inspection use the selected mapped period. Monthly concentration analysis appears when mapped month and concentration columns provide at least two observed months. Other demo pages remain synthetic.",
                     class_name="mt-1 text-xs leading-relaxed text-slate-600",
                 ),
             ),

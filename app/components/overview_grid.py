@@ -1,8 +1,217 @@
 import reflex as rx
-from app.states.overview_grid import OverviewGrid as G, GridLayer, GridLegend
+import reflex_xy as xy
+from app.states.overview_grid import (
+    OverviewGrid as G,
+    GridLayer,
+    GridLegend,
+    GridMetric,
+)
 
 
 BUTTON = "inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-40 disabled:cursor-not-allowed"
+
+
+def uploaded_period_select(
+    label: str, value: rx.Var, options: rx.Var, event: rx.event.EventType
+) -> rx.Component:
+    return rx.el.label(
+        rx.el.span(label, class_name="text-[10px] font-medium text-slate-600"),
+        rx.el.div(
+            rx.el.select(
+                rx.foreach(
+                    options, lambda option: rx.el.option(option, value=option)
+                ),
+                value=value,
+                on_change=event,
+                disabled=(G.status == "loading") | (options.length() == 0),
+                class_name="min-h-9 w-full appearance-none rounded-md border border-slate-200 bg-white py-2 pl-3 pr-8 text-xs text-slate-700 focus-visible:outline-2 focus-visible:outline-sky-700 disabled:opacity-40",
+            ),
+            rx.icon(
+                "chevron-down",
+                class_name="pointer-events-none absolute right-3 top-3 h-3 w-3 text-slate-500",
+            ),
+            class_name="relative",
+        ),
+        class_name="block min-w-24",
+    )
+
+
+def uploaded_period_controls() -> rx.Component:
+    return rx.el.div(
+        rx.el.span(
+            rx.cond(
+                G.status == "loading", "Loading saved period…", G.period_label
+            ),
+            class_name="text-xs font-semibold text-[#245f7e]",
+        ),
+        rx.cond(
+            G.dated_year,
+            uploaded_period_select(
+                "Year", G.selected_year.to_string(), G.years, G.choose_year
+            ),
+        ),
+        rx.cond(
+            G.dated_month,
+            uploaded_period_select(
+                "Month · CSV number",
+                G.selected_month.to_string(),
+                G.months,
+                G.choose_month,
+            ),
+        ),
+        class_name="flex flex-wrap items-center gap-3 self-start pt-5",
+    )
+
+
+def uploaded_timeline() -> rx.Component:
+    return rx.el.div(
+        rx.el.div(
+            rx.icon("calendar-days", class_name="h-4 w-4 text-[#286180]"),
+            rx.el.span(
+                G.period_label,
+                class_name="text-xs font-semibold text-slate-700",
+            ),
+            rx.el.span(
+                "SAVED CSV PERIOD",
+                class_name="text-[9px] tracking-wider text-slate-600",
+            ),
+            class_name="flex flex-wrap items-center gap-2",
+        ),
+        rx.el.div(
+            rx.el.button(
+                rx.icon("skip-back", class_name="h-3.5 w-3.5"),
+                on_click=G.step_month(-1),
+                aria_label="Previous available CSV month",
+                disabled=(~G.dated_month)
+                | (G.months.length() < 2)
+                | (G.status == "loading"),
+                class_name=BUTTON,
+            ),
+            rx.el.button(
+                rx.icon(
+                    rx.cond(G.playing, "pause", "play"),
+                    class_name="h-3.5 w-3.5",
+                ),
+                on_click=G.toggle_play,
+                aria_label="Play or pause available CSV months",
+                disabled=(~G.dated_month) | (G.months.length() < 2),
+                class_name=BUTTON,
+            ),
+            rx.el.button(
+                rx.icon("skip-forward", class_name="h-3.5 w-3.5"),
+                on_click=G.step_month(1),
+                aria_label="Next available CSV month",
+                disabled=(~G.dated_month)
+                | (G.months.length() < 2)
+                | (G.status == "loading"),
+                class_name=BUTTON,
+            ),
+            rx.foreach(
+                G.months,
+                lambda month: rx.el.button(
+                    f"Month {month}",
+                    on_click=G.choose_month(month),
+                    disabled=G.status == "loading",
+                    aria_pressed=G.selected_month.to_string() == month,
+                    class_name=rx.cond(
+                        G.selected_month.to_string() == month,
+                        "min-h-9 rounded-md bg-[#245f7e] px-3 text-xs text-white focus-visible:outline-2 focus-visible:outline-sky-700 disabled:opacity-40",
+                        "min-h-9 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-600 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-sky-700 disabled:opacity-40",
+                    ),
+                ),
+            ),
+            class_name="mt-3 flex flex-wrap items-center gap-2",
+        ),
+        rx.el.p(
+            rx.cond(
+                G.dated_month,
+                "Only months present in valid mapped CSV dates are offered. Playback steps available months in the selected year; it does not infer missing observations.",
+                "Month stepping and playback unavailable · month column not mapped.",
+            ),
+            class_name="mt-2 text-[10px] leading-relaxed text-slate-600",
+        ),
+        class_name="border-t border-slate-200 bg-white p-4",
+    )
+
+
+def uploaded_metric(item: GridMetric) -> rx.Component:
+    return rx.el.div(
+        rx.el.h3(
+            item["label"], class_name="text-[11px] font-medium text-slate-600"
+        ),
+        rx.el.p(
+            item["value"],
+            class_name="mt-3 break-words font-['IBM_Plex_Sans'] text-xl font-medium text-[#183d54]",
+        ),
+        rx.el.p(
+            item["method"],
+            class_name="mt-2 text-[10px] leading-relaxed text-slate-600",
+        ),
+        class_name="min-w-0 rounded-lg border border-slate-200 bg-white p-4",
+    )
+
+
+def uploaded_seasonal() -> rx.Component:
+    return rx.el.section(
+        rx.el.div(
+            rx.el.h3(
+                "Observed monthly concentration",
+                class_name="text-sm font-semibold text-slate-800",
+            ),
+            rx.el.p(
+                rx.cond(
+                    G.dated_year,
+                    f"Chosen year · {G.selected_year}",
+                    "All saved months · year column not mapped",
+                ),
+                class_name="mt-1 text-[11px] text-[#245f7e]",
+            ),
+            class_name="p-4",
+        ),
+        rx.cond(
+            G.chart_reason == "",
+            rx.el.div(
+                xy.chart(
+                    xy.line(
+                        "month",
+                        "mean",
+                        name="CSV mean concentration",
+                        color="#377fa0",
+                        width=2.5,
+                    ),
+                    xy.scatter("month", "mean", color="#245f7e", size=5),
+                    xy.x_axis(label="Mapped month · 1–12"),
+                    xy.y_axis(label="Mean concentration (%)"),
+                    xy.modebar(False),
+                    xy.interaction_config(navigation=False),
+                    data=G.seasonal,
+                    height="240px",
+                    class_name="w-full min-w-[300px]",
+                ),
+                rx.el.ul(
+                    rx.foreach(
+                        G.monthly,
+                        lambda row: rx.el.li(
+                            f"Month {row['month']} · {row['mean']:.2f}% · n = {row['count']:,}",
+                            class_name="text-[10px] text-slate-600",
+                        ),
+                    ),
+                    class_name="flex flex-wrap gap-x-5 gap-y-2 px-4 pb-4",
+                ),
+                class_name="w-full overflow-x-auto",
+            ),
+            rx.el.p(
+                G.chart_reason,
+                role="status",
+                class_name="min-h-28 px-4 py-5 text-xs leading-relaxed text-slate-600",
+            ),
+        ),
+        rx.el.p(
+            "Arithmetic mean of valid mapped concentration (0–100%) at unique valid x/y per month. First saved row per pixel and period wins, including missing readings; missing values are excluded, never filled. Lines connect observed months only, not estimates. n is the number of valid concentration pixels. No area weighting, validated ocean mask or cell resolution is supplied; pixel counts are NOT Antarctic extent. Units follow your mapping. CSV cluster/MIZ counts are labels, not trained models or inferred zones.",
+            class_name="border-t border-slate-200 p-4 text-[11px] leading-relaxed text-slate-600",
+        ),
+        class_name="mt-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white",
+    )
 
 
 def grid_layer(layer: GridLayer) -> rx.Component:
@@ -195,7 +404,7 @@ def grid_map() -> rx.Component:
             (G.status == "ready") | (G.status == "empty"),
             rx.el.div(
                 rx.el.p(
-                    f"{G.valid:,} valid rendered pixels · {G.skipped:,} skipped rows · {G.total:,} rows examined",
+                    f"{G.valid:,} valid rendered pixels · {G.skipped:,} skipped period rows · {G.period_rows:,} rows in selected period",
                     class_name="text-xs font-medium text-[#183d54]",
                 ),
                 rx.el.p(
@@ -203,7 +412,11 @@ def grid_map() -> rx.Component:
                     class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
                 ),
                 rx.el.p(
-                    f"{104912 - G.valid:,} pixels transparent. First saved row at each coordinate wins (row position, then row ID), even if its measurement is empty; later duplicates are skipped.",
+                    f"{104912 - G.valid:,} pixels transparent. First saved row at each coordinate within the selected period wins (row position, then row ID), even if its measurement is empty; later duplicates are skipped.",
+                    class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
+                ),
+                rx.el.p(
+                    f"{G.total:,} saved rows examined · {G.invalid_dates:,} invalid mapped dates excluded. Other valid periods do not contribute to this map or its cards.",
                     class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
                 ),
                 rx.el.p(
@@ -213,6 +426,7 @@ def grid_map() -> rx.Component:
                 class_name="border-t border-slate-200 bg-white p-4",
             ),
         ),
+        uploaded_timeline(),
         class_name="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-[#f4f8fa]",
     )
 
@@ -223,7 +437,7 @@ def grid_inspector() -> rx.Component:
             "Pixel inspector", class_name="text-sm font-semibold text-slate-800"
         ),
         rx.el.p(
-            "Inspect a saved row by its actual pixel x/y, not a region or geographic location.",
+            f"Inspect a saved row in {G.period_label} by its actual pixel x/y, not a region or geographic location.",
             class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
         ),
         rx.el.form(
@@ -313,15 +527,27 @@ def uploaded_overview() -> rx.Component:
             rx.icon("info", class_name="h-4 w-4 shrink-0 text-[#286180]"),
             rx.el.div(
                 rx.el.p(
-                    "Uploaded map only · Overview summaries unavailable",
+                    "Saved CSV observations · period-filtered map and summaries",
                     class_name="text-xs font-semibold text-[#183d54]",
                 ),
                 rx.el.p(
-                    "Extent, seasonal chart and model summary are hidden: they are not calculated from this CSV. The existing year/month controls belong to the demo and do not filter this grid. All saved rows are considered; duplicate coordinates are not interpreted as a time series.",
+                    "Mapped valid dates select the same period for pixels, cards and inspection. The monthly chart uses actual concentration observations within the chosen year, or all months when year is not mapped. No inferred area, missing values or model results are added; other demo pages remain synthetic.",
                     class_name="mt-1 text-[11px] leading-relaxed text-slate-600",
                 ),
             ),
             class_name="mb-4 flex gap-3 rounded-lg border border-slate-200 bg-[#edf4f7] p-4",
+        ),
+        rx.cond(
+            G.status == "loading",
+            rx.el.p(
+                "Loading selected-period summaries…",
+                role="status",
+                class_name="mb-4 text-xs text-slate-600",
+            ),
+            rx.el.div(
+                rx.foreach(G.metrics, uploaded_metric),
+                class_name="mb-4 grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5",
+            ),
         ),
         rx.el.div(
             grid_map(),
@@ -357,5 +583,6 @@ def uploaded_overview() -> rx.Component:
             ),
             class_name="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]",
         ),
+        rx.cond(G.status != "loading", uploaded_seasonal()),
         class_name="w-full min-w-0",
     )

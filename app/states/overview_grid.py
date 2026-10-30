@@ -1,5 +1,7 @@
 import reflex as rx
 import asyncio
+import calendar
+import reflex_xy as xy
 import base64
 import colorsys
 import io
@@ -41,7 +43,34 @@ class GridLegend(TypedDict):
     swatch: str
 
 
+class GridPeriod(TypedDict):
+    year: int
+    month: int
+
+
+class GridMetric(TypedDict):
+    label: str
+    value: str
+    method: str
+
+
+class MonthlyReading(TypedDict):
+    month: int
+    mean: float
+    count: int
+
+
 class GridResult(TypedDict):
+    periods: list[GridPeriod]
+    year: int
+    month: int
+    dated_year: bool
+    dated_month: bool
+    invalid_dates: int
+    period_rows: int
+    metrics: list[GridMetric]
+    monthly: list[MonthlyReading]
+    chart_reason: str
     status: str
     source_id: int
     name: str
@@ -63,6 +92,18 @@ class GridResult(TypedDict):
 
 
 class OverviewGrid(rx.State):
+    periods: list[GridPeriod] = []
+    selected_year: int = 0
+    selected_month: int = 0
+    dated_year: bool = False
+    dated_month: bool = False
+    invalid_dates: int = 0
+    period_rows: int = 0
+    metrics: list[GridMetric] = []
+    monthly: list[MonthlyReading] = []
+    chart_reason: str = "Loading saved observations…"
+    playing: bool = False
+    play_id: int = 0
     status: str = "loading"
     source_id: int = 0
     source_name: str = ""
@@ -89,6 +130,47 @@ class OverviewGrid(rx.State):
     )
     inspecting: bool = False
     inspection_details: list[dict[str, str]] = []
+
+    @rx.var
+    def period_label(self) -> str:
+        if not self.dated_year and not self.dated_month:
+            return "Undated snapshot"
+        if not self.periods:
+            return "No valid mapped dates"
+        month = (
+            calendar.month_name[self.selected_month]
+            if self.selected_month
+            else ""
+        )
+        year = str(self.selected_year) if self.selected_year else ""
+        return f"{month} {year}".strip()
+
+    @rx.var
+    def years(self) -> list[str]:
+        return [
+            str(y)
+            for y in sorted({p["year"] for p in self.periods if p["year"]})
+        ]
+
+    @rx.var
+    def months(self) -> list[str]:
+        return [
+            str(m)
+            for m in sorted(
+                {
+                    p["month"]
+                    for p in self.periods
+                    if p["year"] == self.selected_year and p["month"]
+                }
+            )
+        ]
+
+    @xy.data
+    def seasonal(self) -> dict[str, list[float]]:
+        return {
+            "month": [float(row["month"]) for row in self.monthly],
+            "mean": [row["mean"] for row in self.monthly],
+        }
 
     @rx.var
     def label(self) -> str:
@@ -205,6 +287,26 @@ class OverviewGrid(rx.State):
     @staticmethod
     def _base_result() -> GridResult:
         return {
+            "periods": [],
+            "year": 0,
+            "month": 0,
+            "dated_year": False,
+            "dated_month": False,
+            "invalid_dates": 0,
+            "period_rows": 0,
+            "metrics": [],
+            "monthly": [],
+            "chart_reason": "No uploaded source.",
+            "periods": [],
+            "year": 0,
+            "month": 0,
+            "dated_year": False,
+            "dated_month": False,
+            "invalid_dates": 0,
+            "period_rows": 0,
+            "metrics": [],
+            "monthly": [],
+            "chart_reason": "No uploaded source.",
             "status": "demo",
             "source_id": 0,
             "name": "",
@@ -257,7 +359,11 @@ class OverviewGrid(rx.State):
                 result["duplicates"] += 1
                 continue
             occupied[offset] = 1
-            raw_value = cells[indices[layer]] if cells is not None else ""
+            raw_value = (
+                cells[indices[layer]]
+                if cells is not None and layer in indices
+                else ""
+            )
             value = OverviewGrid._number(raw_value)
             if discrete:
                 category = OverviewGrid._category(raw_value)
@@ -324,6 +430,184 @@ class OverviewGrid(rx.State):
         return image, gradient
 
     @staticmethod
+    def _period(
+        cells: list[str] | None, indices: dict[str, int]
+    ) -> tuple[int, int] | None:
+        dates = []
+        for key, bound in (("year", 9999), ("month", 12)):
+            if key not in indices:
+                dates.append(0)
+                continue
+            value = OverviewGrid._number(cells[indices[key]]) if cells else None
+            if (
+                value is None
+                or not value.is_integer()
+                or not 1 <= value <= bound
+            ):
+                return None
+            dates.append(int(value))
+        return dates[0], dates[1]
+
+    @staticmethod
+    def _scan(
+        rows: Iterable[tuple[int, str]],
+        columns: list[str],
+        mapping: dict[str, str],
+        layer: str,
+        result: GridResult,
+        year: int = 0,
+        month: int = 0,
+    ) -> tuple[Image.Image, Image.Image]:
+        indices = OverviewGrid._indices(columns, mapping)
+        result["dated_year"], result["dated_month"] = (
+            "year" in indices,
+            "month" in indices,
+        )
+        chosen = (
+            year if "year" in indices else 0,
+            month if "month" in indices else 0,
+        )
+        automatic = not year and not month
+        selected: list[tuple[int, str]] = []
+        periods: set[tuple[int, int]] = set()
+        seen: set[tuple[int, int, int, int]] = set()
+        monthly: dict[tuple[int, int], tuple[float, int]] = {}
+        examined = 0
+        for position, raw in rows:
+            examined += 1
+            if examined > MAX_ROWS:
+                raise ValueError(
+                    "This source exceeds the supported 120,000-row limit."
+                )
+            cells = OverviewGrid._cells(raw, len(columns))
+            period = OverviewGrid._period(cells, indices)
+            if period is None:
+                result["invalid_dates"] += 1
+                continue
+            periods.add(period)
+            if automatic and (len(periods) == 1 or period < chosen):
+                if period != chosen:
+                    selected.clear()
+                chosen = period
+            if period == chosen:
+                selected.append((position, raw))
+            coordinate = OverviewGrid._coordinate(
+                position, cells, indices, mapping["coordinate_mode"]
+            )
+            if coordinate is None:
+                continue
+            identity = (*period, *coordinate)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            if "sea_ice_concentration" in indices and cells:
+                value = OverviewGrid._number(
+                    cells[indices["sea_ice_concentration"]]
+                )
+                if value is not None and 0 <= value <= 100:
+                    mean, count = monthly.get(period, (0.0, 0))
+                    monthly[period] = (
+                        mean + (value - mean) / (count + 1),
+                        count + 1,
+                    )
+        result["periods"] = [
+            {"year": y, "month": m} for y, m in sorted(periods)
+        ]
+        result["year"], result["month"] = chosen
+        result["period_rows"] = len(selected)
+        result["monthly"] = [
+            {"month": m, "mean": mean, "count": count}
+            for (y, m), (mean, count) in sorted(monthly.items())
+            if m and y == chosen[0]
+        ]
+        result["chart_reason"] = (
+            "Not available · month column not mapped"
+            if "month" not in indices
+            else "Not available · concentration column not mapped"
+            if "sea_ice_concentration" not in indices
+            else "Not available · fewer than two months with valid concentration readings (0–100%)"
+            if len(result["monthly"]) < 2
+            else ""
+        )
+        occupied: set[tuple[int, int]] = set()
+        means: dict[str, tuple[float, int]] = {}
+        categories: dict[str, set[str]] = {key: set() for key in DISCRETE}
+        category_counts = {key: 0 for key in DISCRETE}
+        threshold = 0
+        for position, raw in selected:
+            cells = OverviewGrid._cells(raw, len(columns))
+            coordinate = OverviewGrid._coordinate(
+                position, cells, indices, mapping["coordinate_mode"]
+            )
+            if coordinate is None or coordinate in occupied or cells is None:
+                continue
+            occupied.add(coordinate)
+            for key in ("sea_ice_concentration", "sea_surface_temperature"):
+                if key not in indices:
+                    continue
+                value = OverviewGrid._number(cells[indices[key]])
+                if value is None or (
+                    key == "sea_ice_concentration" and not 0 <= value <= 100
+                ):
+                    continue
+                mean, count = means.get(key, (0.0, 0))
+                means[key] = (
+                    mean * (count / (count + 1)) + value / (count + 1),
+                    count + 1,
+                )
+                if key == "sea_ice_concentration" and value >= 15:
+                    threshold += 1
+            for key in DISCRETE:
+                if key in indices:
+                    category = OverviewGrid._category(cells[indices[key]])
+                    if category is not None:
+                        categories[key].add(category)
+                        category_counts[key] += 1
+        for key, label, unit in (
+            ("sea_ice_concentration", "Mean concentration", "%"),
+            ("sea_surface_temperature", "Mean sea-surface temperature", "°C"),
+            ("cluster", "Distinct CSV cluster labels", "labels"),
+            ("marginal_ice_zone", "Distinct MIZ categories", "categories"),
+        ):
+            count = (
+                category_counts.get(key, 0)
+                if key in DISCRETE
+                else means.get(key, (0.0, 0))[1]
+            )
+            value = (
+                f"{len(categories[key]):,} {unit}"
+                if key in DISCRETE
+                else f"{means.get(key, (0.0, 0))[0]:.2f} {unit}"
+            )
+            result["metrics"].append(
+                {
+                    "label": label,
+                    "value": value if count else "Not available",
+                    "method": f"n = {count:,} unique pixels · selected period"
+                    if count
+                    else "Column not mapped"
+                    if key not in indices
+                    else "No valid values in selected period",
+                }
+            )
+        count = means.get("sea_ice_concentration", (0.0, 0))[1]
+        result["metrics"].insert(
+            1,
+            {
+                "label": "Pixels with concentration ≥15%",
+                "value": f"{threshold:,} pixels" if count else "Not available",
+                "method": f"n = {count:,} · pixel count, NOT area or extent"
+                if count
+                else "Column not mapped"
+                if "sea_ice_concentration" not in indices
+                else "No valid values in selected period",
+            },
+        )
+        images = OverviewGrid._raster(selected, columns, mapping, layer, result)
+        result["total"] = examined
+        return images
+
+    @staticmethod
     def _continuous_color(fraction: float) -> tuple[int, int, int]:
         fraction = min(1.0, max(0.0, fraction))
         return tuple(
@@ -332,7 +616,9 @@ class OverviewGrid(rx.State):
         )
 
     @staticmethod
-    def _render(preferred: str) -> GridResult:
+    def _render(
+        preferred: str, year: int = 0, month: int = 0, source_id: int = 0
+    ) -> GridResult:
         result = OverviewGrid._base_result()
         with rx.session() as session:
             session.connection(
@@ -372,20 +658,19 @@ class OverviewGrid(rx.State):
                 ]
                 if mapping["coordinate_mode"] == "row_order":
                     OverviewGrid._check_positions(session, dataset.id)
-                if not result["layers"]:
-                    result["status"] = "unmapped"
-                    result["message"] = (
-                        "Measurement not mapped. Open Data and map at least one measurement to render this source."
-                    )
-                    return result
                 layer = (
                     preferred
                     if any(
                         item["key"] == preferred for item in result["layers"]
                     )
                     else result["layers"][0]["key"]
+                    if result["layers"]
+                    else ""
                 )
-                result["layer"], result["column"] = layer, mapping[layer]
+                result["layer"], result["column"] = (
+                    layer,
+                    mapping.get(layer, ""),
+                )
                 query = (
                     select(
                         UploadedDatasetRow.row_position,
@@ -398,17 +683,49 @@ class OverviewGrid(rx.State):
                     .limit(MAX_ROWS + 1)
                     .execution_options(yield_per=1000)
                 )
-                image, gradient = OverviewGrid._raster(
-                    session.execute(query), columns, mapping, layer, result
+                image, gradient = OverviewGrid._scan(
+                    session.execute(query),
+                    columns,
+                    mapping,
+                    layer,
+                    result,
+                    year if source_id == dataset.id else 0,
+                    month if source_id == dataset.id else 0,
                 )
             except ValueError as e:
                 logging.exception(f"Error: {e}")
                 result["status"], result["message"] = "error", str(e)
                 return result
+        if not result["layers"]:
+            result["status"], result["message"] = (
+                "unmapped",
+                "Measurement not mapped. Configure columns in Data.",
+            )
+            return result
+        if not result["total"]:
+            result["status"], result["message"] = (
+                "empty",
+                "No saved rows in this source.",
+            )
+            return result
+        if not result["periods"] and (
+            result["dated_year"] or result["dated_month"]
+        ):
+            result["status"], result["message"] = (
+                "empty",
+                "No valid mapped dates. Year must be an integer 1–9999; month must be an integer 1–12. Rows with invalid mapped dates are excluded.",
+            )
+            return result
+        if not result["period_rows"]:
+            result["status"], result["message"] = (
+                "empty",
+                "No saved rows in the selected period. Select an available period.",
+            )
+            return result
         if not result["valid"]:
             result["status"] = "empty"
             result["message"] = (
-                "No valid readings for the selected mapped measurement. Empty or invalid cells remain transparent."
+                "The selected period has saved rows, but no valid readings for the selected mapped measurement. Empty or invalid cells remain transparent."
             )
             return result
         token = uuid4().hex
@@ -431,7 +748,7 @@ class OverviewGrid(rx.State):
         )
         result["status"] = "ready"
         result["message"] = (
-            "Saved CSV readings · pixel positioning only · no projection or inferred observations."
+            "Saved CSV readings · selected period only · pixel positioning, no projection or inferred observations."
         )
         return result
 
@@ -454,10 +771,88 @@ class OverviewGrid(rx.State):
             "Enter a pixel coordinate to inspect its saved observation."
         )
         self.status = "loading"
+        self.metrics = []
+        self.monthly = []
+        self.chart_reason = "Loading saved observations…"
         self.message = (
             "Loading the saved source and rasterizing its mapped readings…"
         )
-        return OverviewGrid.render(self.request_id, self.selected_layer)
+        return OverviewGrid.render(
+            self.request_id,
+            self.selected_layer,
+            self.selected_year,
+            self.selected_month,
+            self.source_id,
+        )
+
+    @rx.event
+    def choose_year(self, value: str):
+        if value not in self.years or self.status == "loading":
+            return
+        self.playing = False
+        self.play_id += 1
+        self.selected_year = int(value)
+        available = sorted(
+            p["month"] for p in self.periods if p["year"] == self.selected_year
+        )
+        if self.selected_month not in available:
+            self.selected_month = available[0]
+        self.request_id += 1
+        self.inspect_id += 1
+        self.inspection_details = []
+        return OverviewGrid.refresh
+
+    @rx.event
+    def choose_month(self, value: str):
+        if value not in self.months or self.status == "loading":
+            return
+        self.playing = False
+        self.play_id += 1
+        self.selected_month = int(value)
+        self.request_id += 1
+        self.inspect_id += 1
+        self.inspection_details = []
+        return OverviewGrid.refresh
+
+    @rx.event
+    def step_month(self, amount: int):
+        if (
+            not self.dated_month
+            or len(self.months) < 2
+            or self.status == "loading"
+        ):
+            return
+        months = [int(m) for m in self.months]
+        self.selected_month = months[
+            (months.index(self.selected_month) + amount) % len(months)
+        ]
+        self.request_id += 1
+        self.inspect_id += 1
+        self.inspection_details = []
+        return OverviewGrid.refresh
+
+    @rx.event
+    def toggle_play(self):
+        self.playing = (
+            not self.playing and self.dated_month and len(self.months) > 1
+        )
+        self.play_id += 1
+        if self.playing:
+            return OverviewGrid.animate(self.play_id)
+
+    @rx.event(background=True)
+    async def animate(self, token: int):
+        for _ in range(24):
+            await asyncio.sleep(1.5)
+            async with self:
+                if not self.playing or token != self.play_id:
+                    return
+                ready = self.status != "loading"
+            if ready:
+                yield OverviewGrid.step_month(1)
+        async with self:
+            if token == self.play_id:
+                self.playing = False
 
     @rx.event
     def choose_layer(self, key: str):
@@ -467,9 +862,18 @@ class OverviewGrid(rx.State):
         return OverviewGrid.refresh
 
     @rx.event(background=True)
-    async def render(self, request_id: int, preferred: str):
+    async def render(
+        self,
+        request_id: int,
+        preferred: str,
+        year: int = 0,
+        month: int = 0,
+        source_id: int = 0,
+    ):
         try:
-            result = await asyncio.to_thread(OverviewGrid._render, preferred)
+            result = await asyncio.to_thread(
+                OverviewGrid._render, preferred, year, month, source_id
+            )
             async with self:
                 stale = request_id != self.request_id
                 cleanup = (
@@ -478,6 +882,30 @@ class OverviewGrid(rx.State):
                     else [self.filename, self.legend_filename]
                 )
                 if not stale:
+                    if (
+                        result["source_id"] != self.source_id
+                        or not result["dated_month"]
+                    ):
+                        self.playing = False
+                        self.play_id += 1
+                    self.periods = result["periods"]
+                    self.selected_year, self.selected_month = (
+                        result["year"],
+                        result["month"],
+                    )
+                    self.dated_year, self.dated_month = (
+                        result["dated_year"],
+                        result["dated_month"],
+                    )
+                    self.invalid_dates, self.period_rows = (
+                        result["invalid_dates"],
+                        result["period_rows"],
+                    )
+                    self.metrics, self.monthly = (
+                        result["metrics"],
+                        result["monthly"],
+                    )
+                    self.chart_reason = result["chart_reason"]
                     self.status = result["status"]
                     self.source_id = result["source_id"]
                     self.source_name = result["name"]
@@ -510,7 +938,12 @@ class OverviewGrid(rx.State):
 
     @staticmethod
     def _lookup(
-        dataset_id: int, layer: str, x: int, y: int
+        dataset_id: int,
+        layer: str,
+        x: int,
+        y: int,
+        year: int = 0,
+        month: int = 0,
     ) -> tuple[str, list[dict[str, str]]]:
         with rx.session() as session:
             session.connection(
@@ -558,6 +991,8 @@ class OverviewGrid(rx.State):
                 query.execution_options(yield_per=1000)
             ):
                 cells = OverviewGrid._cells(raw, len(columns))
+                if OverviewGrid._period(cells, indices) != (year, month):
+                    continue
                 if OverviewGrid._coordinate(
                     position, cells, indices, mapping["coordinate_mode"]
                 ) == (x, y):
@@ -651,6 +1086,8 @@ class OverviewGrid(rx.State):
             self.selected_layer,
             int(x),
             int(y),
+            self.selected_year,
+            self.selected_month,
         )
 
     @rx.event(background=True)
@@ -662,15 +1099,19 @@ class OverviewGrid(rx.State):
         layer: str,
         x: int,
         y: int,
+        year: int = 0,
+        month: int = 0,
     ):
         try:
             heading, details = await asyncio.to_thread(
-                OverviewGrid._lookup, dataset_id, layer, x, y
+                OverviewGrid._lookup, dataset_id, layer, x, y, year, month
             )
             async with self:
                 if (
                     inspect_id == self.inspect_id
                     and request_id == self.request_id
+                    and year == self.selected_year
+                    and month == self.selected_month
                 ):
                     self.inspection, self.inspection_details = heading, details
                     self.inspecting = False

@@ -2,7 +2,10 @@ import reflex as rx
 import reflex_xy as xy
 from app.states.explorer import Explorer as S
 from app.components.uploaded_data import uploaded_workspace
-from app.components.overview_grid import uploaded_overview
+from app.components.overview_grid import (
+    uploaded_overview,
+    uploaded_period_controls,
+)
 from app.states.overview_grid import OverviewGrid as G
 
 
@@ -137,7 +140,7 @@ def header() -> rx.Component:
                 rx.el.span(class_name="h-1.5 w-1.5 rounded-full bg-teal-600"),
                 rx.cond(
                     (S.page == "Overview") & (G.status != "demo"),
-                    "Uploaded grid · no derived summaries",
+                    "Saved CSV · observed readings",
                     "Synthetic dataset",
                 ),
                 class_name="hidden sm:flex items-center gap-2 text-xs text-slate-600",
@@ -211,32 +214,36 @@ def title() -> rx.Component:
                 class_name="mt-2 text-xs text-slate-500",
             ),
         ),
-        rx.el.div(
-            selector(
-                "Year", S.year, ["2017", "2020", "2023", "2024"], S.set_year
-            ),
+        rx.cond(
+            (S.page == "Overview") & (G.status != "demo"),
+            uploaded_period_controls(),
             rx.el.div(
-                rx.el.button(
-                    "February",
-                    on_click=S.set_month(2),
-                    class_name=rx.cond(
-                        S.month == 2,
-                        "px-4 min-h-9 rounded-md bg-[#245f7e] text-white text-xs font-medium",
-                        "px-4 min-h-9 rounded-md text-slate-600 text-xs hover:bg-slate-100",
-                    ),
+                selector(
+                    "Year", S.year, ["2017", "2020", "2023", "2024"], S.set_year
                 ),
-                rx.el.button(
-                    "September",
-                    on_click=S.set_month(9),
-                    class_name=rx.cond(
-                        S.month == 9,
-                        "px-4 min-h-9 rounded-md bg-[#245f7e] text-white text-xs font-medium",
-                        "px-4 min-h-9 rounded-md text-slate-600 text-xs hover:bg-slate-100",
+                rx.el.div(
+                    rx.el.button(
+                        "February",
+                        on_click=S.set_month(2),
+                        class_name=rx.cond(
+                            S.month == 2,
+                            "px-4 min-h-9 rounded-md bg-[#245f7e] text-white text-xs font-medium",
+                            "px-4 min-h-9 rounded-md text-slate-600 text-xs hover:bg-slate-100",
+                        ),
                     ),
+                    rx.el.button(
+                        "September",
+                        on_click=S.set_month(9),
+                        class_name=rx.cond(
+                            S.month == 9,
+                            "px-4 min-h-9 rounded-md bg-[#245f7e] text-white text-xs font-medium",
+                            "px-4 min-h-9 rounded-md text-slate-600 text-xs hover:bg-slate-100",
+                        ),
+                    ),
+                    class_name="flex rounded-lg border border-slate-200 p-1 bg-white",
                 ),
-                class_name="flex rounded-lg border border-slate-200 p-1 bg-white",
+                class_name="flex items-center gap-3 self-start pt-5",
             ),
-            class_name="flex items-center gap-3 self-start pt-5",
         ),
         class_name="mb-5 flex flex-wrap items-center justify-between gap-4",
     )
@@ -1205,7 +1212,7 @@ def about() -> rx.Component:
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 rx.el.p(
-                    "Overview renders the explicitly selected uploaded CSV as a 316-column × 332-row pixel grid, with only mapped measurements and saved observations in its inspector. It is not a geographic projection. Overview summaries and seasonal analysis are unavailable for uploaded sources; existing period controls do not filter the uploaded grid. Without a selected source, Overview remains the synthetic demo. Map Explorer, Compare and Model Insights remain synthetic. No satellite APIs or machine learning execution are connected. This is not production software or evidence of climate trends.",
+                    "Overview renders the explicitly selected uploaded CSV as a 316-column × 332-row pixel grid, with only mapped measurements and saved observations in its inspector. It is not a geographic projection. Mapped valid years/months filter pixels, computed cards and inspection together. Concentration and SST means, concentration pixel counts and CSV category counts use selected-period readings only. Monthly concentration analysis is shown only with at least two observed months; missing columns or valid readings have explicit unavailable states. Pixel counts are not area or Antarctic extent. Without a selected source, Overview remains the synthetic demo. Map Explorer, Compare and Model Insights remain synthetic. No satellite APIs or machine learning execution are connected. This is not production software or evidence of climate trends.",
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 class_name="border-t border-slate-200 mt-8 pt-6",
