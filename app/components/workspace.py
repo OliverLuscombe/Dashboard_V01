@@ -138,9 +138,18 @@ def header() -> rx.Component:
         rx.el.div(
             rx.el.span(
                 rx.el.span(class_name="h-1.5 w-1.5 rounded-full bg-teal-600"),
-                rx.cond(
-                    (S.page == "Overview") & (G.status != "demo"),
-                    "Saved CSV · observed readings",
+                rx.match(
+                    S.page,
+                    ("Data", "CSV workspace"),
+                    ("About", "Workspace guide"),
+                    (
+                        "Overview",
+                        rx.cond(
+                            G.status != "demo",
+                            "Saved CSV · observed readings",
+                            "Synthetic dataset",
+                        ),
+                    ),
                     "Synthetic dataset",
                 ),
                 class_name="hidden sm:flex items-center gap-2 text-xs text-slate-600",
@@ -215,34 +224,43 @@ def title() -> rx.Component:
             ),
         ),
         rx.cond(
-            (S.page == "Overview") & (G.status != "demo"),
-            uploaded_period_controls(),
-            rx.el.div(
-                selector(
-                    "Year", S.year, ["2017", "2020", "2023", "2024"], S.set_year
-                ),
+            (S.page == "Overview")
+            | (S.page == "Map Explorer")
+            | (S.page == "Compare")
+            | (S.page == "Model Insights"),
+            rx.cond(
+                (S.page == "Overview") & (G.status != "demo"),
+                uploaded_period_controls(),
                 rx.el.div(
-                    rx.el.button(
-                        "February",
-                        on_click=S.set_month(2),
-                        class_name=rx.cond(
-                            S.month == 2,
-                            "px-4 min-h-9 rounded-md bg-[#245f7e] text-white text-xs font-medium",
-                            "px-4 min-h-9 rounded-md text-slate-600 text-xs hover:bg-slate-100",
-                        ),
+                    selector(
+                        "Year",
+                        S.year,
+                        ["2017", "2020", "2023", "2024"],
+                        S.set_year,
                     ),
-                    rx.el.button(
-                        "September",
-                        on_click=S.set_month(9),
-                        class_name=rx.cond(
-                            S.month == 9,
-                            "px-4 min-h-9 rounded-md bg-[#245f7e] text-white text-xs font-medium",
-                            "px-4 min-h-9 rounded-md text-slate-600 text-xs hover:bg-slate-100",
+                    rx.el.div(
+                        rx.el.button(
+                            "February",
+                            on_click=S.set_month(2),
+                            class_name=rx.cond(
+                                S.month == 2,
+                                "px-4 min-h-9 rounded-md bg-[#245f7e] text-white text-xs font-medium",
+                                "px-4 min-h-9 rounded-md text-slate-600 text-xs hover:bg-slate-100",
+                            ),
                         ),
+                        rx.el.button(
+                            "September",
+                            on_click=S.set_month(9),
+                            class_name=rx.cond(
+                                S.month == 9,
+                                "px-4 min-h-9 rounded-md bg-[#245f7e] text-white text-xs font-medium",
+                                "px-4 min-h-9 rounded-md text-slate-600 text-xs hover:bg-slate-100",
+                            ),
+                        ),
+                        class_name="flex rounded-lg border border-slate-200 p-1 bg-white",
                     ),
-                    class_name="flex rounded-lg border border-slate-200 p-1 bg-white",
+                    class_name="flex items-center gap-3 self-start pt-5",
                 ),
-                class_name="flex items-center gap-3 self-start pt-5",
             ),
         ),
         class_name="mb-5 flex flex-wrap items-center justify-between gap-4",

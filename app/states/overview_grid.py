@@ -8,6 +8,7 @@ import io
 import json
 import logging
 import math
+import re
 from array import array
 from collections.abc import Iterable
 from datetime import UTC, datetime
@@ -30,6 +31,10 @@ MEASUREMENTS: dict[str, str] = {
 }
 DISCRETE = ("marginal_ice_zone", "cluster")
 CATEGORY_LIMIT = 32
+NUMERIC_PATTERN = re.compile(
+    r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?",
+    re.ASCII,
+)
 
 
 class GridLayer(TypedDict):
@@ -190,11 +195,10 @@ class OverviewGrid(rx.State):
     def _number(value: object) -> float | None:
         if not isinstance(value, (str, int, float)) or isinstance(value, bool):
             return None
-        try:
-            number = float(value)
-        except (ValueError, OverflowError):
-            logging.exception("Unexpected error")
+        raw = str(value).strip()
+        if not NUMERIC_PATTERN.fullmatch(raw):
             return None
+        number = float(raw)
         return number if math.isfinite(number) else None
 
     @staticmethod
