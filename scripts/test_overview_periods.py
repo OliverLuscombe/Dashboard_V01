@@ -147,6 +147,11 @@ class OverviewPeriodTests(unittest.TestCase):
         self.assertEqual(result["period_rows"], len(RECORDS))
         self.assertIn("month column not mapped", result["chart_reason"])
         view = G()
+        view.dated_year = False
+        view.dated_month = False
+        view.selected_year = 0
+        view.selected_month = 0
+        view.periods = []
         self.assertEqual(view.period_label, "Undated snapshot")
         self.assertEqual(view.months, [])
 
@@ -181,9 +186,43 @@ class OverviewPeriodTests(unittest.TestCase):
         )
         self.assertIn("concentration column not mapped", result["chart_reason"])
         with patch("app.states.overview_grid.logging.exception") as log:
-            for value in ("", "NA", "pack", "NaN", "inf", "1e999"):
+            for value in ("", "NA", "pack", "NaN", "inf", "1e999", 10**400):
                 self.assertIsNone(G._number(value))
             log.assert_not_called()
+
+    def test_discrete_raster_classifies_without_numeric_conversion_or_logs(
+        self,
+    ):
+        for layer in ("cluster", "marginal_ice_zone"):
+            with self.subTest(layer=layer):
+                result = G._base_result()
+                with (
+                    patch.object(G, "_number") as number,
+                    patch("app.states.overview_grid.logging.exception") as log,
+                ):
+                    image, _ = G._raster(
+                        (
+                            (i, json.dumps([label]))
+                            for i, label in enumerate(
+                                ("pack", "edge", "pack", "", "NA", "inf")
+                            )
+                        ),
+                        ["category"],
+                        {"coordinate_mode": "row_order", layer: "category"},
+                        layer,
+                        result,
+                    )
+                    number.assert_not_called()
+                    log.assert_not_called()
+                self.assertEqual(result["valid"], 3)
+                self.assertEqual(result["invalid_readings"], 3)
+                self.assertEqual(
+                    [entry["label"] for entry in result["legends"]],
+                    ["pack", "edge"],
+                )
+                self.assertEqual(image.getpixel((0, 0)), image.getpixel((2, 0)))
+                self.assertEqual(image.getpixel((0, 0))[3], 255)
+                self.assertEqual(image.getpixel((3, 0))[3], 0)
 
     def test_concentration_range_and_zero_are_defensible(self):
         records = [

@@ -297,16 +297,6 @@ class OverviewGrid(rx.State):
             "metrics": [],
             "monthly": [],
             "chart_reason": "No uploaded source.",
-            "periods": [],
-            "year": 0,
-            "month": 0,
-            "dated_year": False,
-            "dated_month": False,
-            "invalid_dates": 0,
-            "period_rows": 0,
-            "metrics": [],
-            "monthly": [],
-            "chart_reason": "No uploaded source.",
             "status": "demo",
             "source_id": 0,
             "name": "",
@@ -364,7 +354,6 @@ class OverviewGrid(rx.State):
                 if cells is not None and layer in indices
                 else ""
             )
-            value = OverviewGrid._number(raw_value)
             if discrete:
                 category = OverviewGrid._category(raw_value)
                 if category is not None:
@@ -377,6 +366,8 @@ class OverviewGrid(rx.State):
                     value = float(categories[category])
                 else:
                     value = None
+            else:
+                value = OverviewGrid._number(raw_value)
             if value is None:
                 result["invalid_readings"] += 1
                 continue
