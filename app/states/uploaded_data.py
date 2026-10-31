@@ -165,6 +165,30 @@ class UploadedData(rx.State):
         return row_position % 316 + 1, 332 - row_position // 316
 
     @staticmethod
+    def _duplicate_mapping_error(mapping: dict[str, str]) -> str:
+        seen: dict[str, str] = {}
+        row_order = mapping.get("coordinate_mode", "columns") == "row_order"
+        for field, label in MAPPING_LABELS.items():
+            if row_order and field in ("x_coordinate", "y_coordinate"):
+                continue
+            column = mapping.get(field, "")
+            if not column:
+                continue
+            if column in seen:
+                first = seen[column]
+                remedy = (
+                    "Choose another distinct column for one pixel coordinate; both x/y columns are required unless you use row-order generation for a complete grid."
+                    if {first, field} == {"x_coordinate", "y_coordinate"}
+                    else "Change one field to Not provided (if absent), or choose another distinct CSV column."
+                )
+                return (
+                    f'CSV column "{column}" is selected for both "{MAPPING_LABELS[first]}" and "{label}". '
+                    f"Map each source column to only one active field. {remedy} No changes were saved."
+                )
+            seen[column] = field
+        return ""
+
+    @staticmethod
     def _validate_mapping(
         columns: list[str], row_count: int, mapping: dict[str, str]
     ) -> dict[str, str]:
@@ -187,15 +211,9 @@ class UploadedData(rx.State):
             raise ValueError(
                 "Map both x_coordinate and y_coordinate columns, or choose row-order generation for a complete 104,912-row grid. Latitude/longitude do not substitute for pixel coordinates."
             )
-        elif clean["x_coordinate"] == clean["y_coordinate"]:
-            raise ValueError(
-                "Choose different source columns for x_coordinate and y_coordinate."
-            )
-        provided = [value for value in clean.values() if value]
-        if len(provided) != len(set(provided)):
-            raise ValueError(
-                "Map each source column to only one field; use Not provided for absent measurements."
-            )
+        duplicate_error = UploadedData._duplicate_mapping_error(mapping)
+        if duplicate_error:
+            raise ValueError(duplicate_error)
         clean["coordinate_mode"] = mode
         return clean
 
@@ -561,8 +579,10 @@ class UploadedData(rx.State):
         mapping["coordinate_mode"] = str(
             form_data.get("coordinate_mode", "columns")
         )
-        self.source_error = ""
+        self.source_error = UploadedData._duplicate_mapping_error(mapping)
         self.source_success = ""
+        if self.source_error:
+            return
         self.source_saving = True
         return UploadedData.persist_source(self.selected_id, mapping, False)
 

@@ -1,8 +1,12 @@
 import reflex as rx
 import unittest
 import tempfile
+import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+
+from test_utils import run_event
 
 from app.states.uploaded_data import (
     MAX_BYTES,
@@ -183,6 +187,56 @@ class OverviewMappingTests(unittest.TestCase):
         self.assertEqual(clean["latitude"], "")
         self.assertEqual(clean["x_coordinate"], "")
 
+    def test_saved_validation_rejects_duplicate_measurements_and_coordinates(
+        self,
+    ):
+        for first, second in (
+            ("sea_ice_concentration", "sea_surface_temperature"),
+            ("x_coordinate", "y_coordinate"),
+        ):
+            with self.subTest(first=first, second=second):
+                mapping = {
+                    "x_coordinate": "x",
+                    "y_coordinate": "y",
+                    first: "actual / selected header",
+                    second: "actual / selected header",
+                }
+                with self.assertRaises(ValueError) as error:
+                    UploadedData._validate_mapping(
+                        ["x", "y", "actual / selected header"], 3, mapping
+                    )
+                message = str(error.exception)
+                self.assertIn("actual / selected header", message)
+                self.assertIn(MAPPING_LABELS[first], message)
+                self.assertIn(MAPPING_LABELS[second], message)
+                self.assertIn("distinct", message)
+
+    def test_write_source_keeps_authoritative_duplicate_validation(self):
+        mapping = {
+            "x_coordinate": "x",
+            "y_coordinate": "y",
+            "sea_ice_concentration": "SIC",
+            "sea_surface_temperature": "SIC",
+        }
+        dataset = SimpleNamespace(
+            column_names_json=json.dumps(["x", "y", "SIC"]),
+            row_count=3,
+            overview_mapping_json="{}",
+            overview_active=False,
+        )
+        session = MagicMock()
+        session.scalar.return_value = dataset
+        with patch("app.states.uploaded_data.rx.session") as factory:
+            factory.return_value.__enter__.return_value = session
+            with self.assertRaisesRegex(ValueError, "Map each source column"):
+                UploadedData._write_source(1, mapping, False)
+        self.assertEqual(session.execute.call_count, 1)
+        self.assertEqual(dataset.overview_mapping_json, "{}")
+        self.assertFalse(dataset.overview_active)
+        self.assertIs(
+            session.begin.return_value.__exit__.call_args.args[0], ValueError
+        )
+
     def test_pixel_order_boundaries(self):
         for position, expected in [
             (0, (1, 332)),
@@ -249,6 +303,137 @@ class OverviewMappingTests(unittest.TestCase):
             )
             session.commit.assert_not_called()
             self.assertFalse(path.exists())
+
+
+class OverviewMappingEventTests(unittest.IsolatedAsyncioTestCase):
+    def _make_state(self, columns: list[str], row_count: int) -> UploadedData:
+        state = UploadedData()
+        state.selected_id = 1
+        state.columns = columns
+        state.row_count = row_count
+        state.source_saving = False
+        state.source_error = ""
+        state.source_success = ""
+        return state
+
+    async def test_duplicate_submit_reports_fields_without_scheduling_save(
+        self,
+    ):
+        for first, second in (
+            ("sea_ice_concentration", "sea_surface_temperature"),
+            ("x_coordinate", "y_coordinate"),
+            ("x_coordinate", "sea_ice_concentration"),
+        ):
+            with self.subTest(first=first, second=second):
+                header = "actual / selected header"
+                form = {
+                    "coordinate_mode": "columns",
+                    "x_coordinate": "x",
+                    "y_coordinate": "y",
+                    first: header,
+                    second: header,
+                }
+                state = self._make_state(["x", "y", header], 3)
+                state.source_success = "Old success"
+                revision = state.mapping_revision
+                with (
+                    patch.object(UploadedData, "persist_source") as save,
+                    patch.object(UploadedData, "_write_source") as write,
+                ):
+                    await run_event(state.apply_source, form)
+                save.assert_not_called()
+                write.assert_not_called()
+                self.assertFalse(state.source_saving)
+                self.assertEqual(state.source_success, "")
+                self.assertEqual(state.mapping_revision, revision)
+                self.assertIn(header, state.source_error)
+                self.assertIn(MAPPING_LABELS[first], state.source_error)
+                self.assertIn(MAPPING_LABELS[second], state.source_error)
+                self.assertIn("distinct", state.source_error)
+                if first != "x_coordinate" or second != "y_coordinate":
+                    self.assertIn("Not provided", state.source_error)
+                self.assertEqual(
+                    state.source_error,
+                    UploadedData._duplicate_mapping_error(form),
+                )
+
+    async def test_independent_mapping_schedules_save_without_dropping_measurements(
+        self,
+    ):
+        form = {
+            "coordinate_mode": "columns",
+            "x_coordinate": "x",
+            "y_coordinate": "y",
+            "sea_ice_concentration": "SIC",
+            "sea_surface_temperature": "SST",
+        }
+        state = self._make_state(["x", "y", "SIC", "SST"], 3)
+        state.source_error = "Old error"
+        with patch.object(
+            UploadedData, "persist_source", return_value=None
+        ) as save:
+            await run_event(state.apply_source, form)
+        self.assertTrue(state.source_saving)
+        self.assertEqual(state.source_error, "")
+        expected = {field: form.get(field, "") for field in MAPPING_LABELS}
+        expected["coordinate_mode"] = "columns"
+        save.assert_called_once_with(1, expected, False)
+        self.assertEqual(
+            UploadedData._validate_mapping(state.columns, 3, expected), expected
+        )
+
+    async def test_row_order_ignores_duplicate_coordinate_selections(self):
+        form = {
+            "coordinate_mode": "row_order",
+            "x_coordinate": "SIC",
+            "y_coordinate": "SIC",
+            "sea_ice_concentration": "SIC",
+        }
+        state = self._make_state(["SIC"], GRID_ROWS)
+        with patch.object(
+            UploadedData, "persist_source", return_value=None
+        ) as save:
+            await run_event(state.apply_source, form)
+        self.assertTrue(state.source_saving)
+        self.assertEqual(state.source_error, "")
+        save.assert_called_once()
+        submitted = save.call_args.args[1]
+        self.assertEqual(submitted["sea_ice_concentration"], "SIC")
+        clean = UploadedData._validate_mapping(["SIC"], GRID_ROWS, submitted)
+        self.assertEqual(clean["x_coordinate"], "")
+        self.assertEqual(clean["y_coordinate"], "")
+        self.assertEqual(clean["sea_ice_concentration"], "SIC")
+
+    async def test_row_order_rejects_duplicate_non_coordinate_fields(self):
+        form = {
+            "coordinate_mode": "row_order",
+            "x_coordinate": "SIC",
+            "y_coordinate": "SIC",
+            "sea_ice_concentration": "SIC",
+            "sea_surface_temperature": "SIC",
+        }
+        state = self._make_state(["SIC"], GRID_ROWS)
+        with (
+            patch.object(UploadedData, "persist_source") as save,
+            patch.object(UploadedData, "_write_source") as write,
+        ):
+            await run_event(state.apply_source, form)
+        save.assert_not_called()
+        write.assert_not_called()
+        self.assertFalse(state.source_saving)
+        self.assertIn('CSV column "SIC"', state.source_error)
+        self.assertIn(
+            MAPPING_LABELS["sea_ice_concentration"], state.source_error
+        )
+        self.assertIn(
+            MAPPING_LABELS["sea_surface_temperature"], state.source_error
+        )
+        self.assertNotIn(MAPPING_LABELS["x_coordinate"], state.source_error)
+        self.assertNotIn(MAPPING_LABELS["y_coordinate"], state.source_error)
+        self.assertIn("Not provided", state.source_error)
+        with self.assertRaises(ValueError) as error:
+            UploadedData._validate_mapping(["SIC"], GRID_ROWS, form)
+        self.assertEqual(str(error.exception), state.source_error)
 
 
 if __name__ == "__main__":

@@ -216,6 +216,14 @@ def source_configuration() -> rx.Component:
                 ),
                 class_name="mt-4 flex flex-wrap gap-2",
             ),
+            rx.cond(
+                D.source_error != "",
+                rx.el.p(
+                    D.source_error,
+                    role="alert",
+                    class_name="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700",
+                ),
+            ),
             key=D.mapping_revision,
             on_submit=D.apply_source,
             class_name="mt-4",
