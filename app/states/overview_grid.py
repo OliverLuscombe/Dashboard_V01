@@ -18,7 +18,12 @@ from uuid import uuid4
 from PIL import Image
 from sqlalchemy import func, select
 from app.models import UploadedDataset, UploadedDatasetRow
-from app.states.uploaded_data import GRID_ROWS, MAX_ROWS, UploadedData
+from app.states.uploaded_data import (
+    GRID_ROWS,
+    MAX_ROWS,
+    MAPPING_LABELS,
+    UploadedData,
+)
 
 
 MEASUREMENTS: dict[str, str] = {
@@ -71,6 +76,8 @@ class GridResult(TypedDict):
     month: int
     dated_year: bool
     dated_month: bool
+    year_source: str
+    month_source: str
     invalid_dates: int
     period_rows: int
     metrics: list[GridMetric]
@@ -102,6 +109,8 @@ class OverviewGrid(rx.State):
     selected_month: int = 0
     dated_year: bool = False
     dated_month: bool = False
+    year_source: str = "Not provided"
+    month_source: str = "Not provided"
     invalid_dates: int = 0
     period_rows: int = 0
     metrics: list[GridMetric] = []
@@ -265,7 +274,7 @@ class OverviewGrid(rx.State):
         return {
             key: columns.index(value)
             for key, value in mapping.items()
-            if key != "coordinate_mode" and value
+            if key in MAPPING_LABELS and value
         }
 
     @staticmethod
@@ -296,6 +305,8 @@ class OverviewGrid(rx.State):
             "month": 0,
             "dated_year": False,
             "dated_month": False,
+            "year_source": "Not provided",
+            "month_source": "Not provided",
             "invalid_dates": 0,
             "period_rows": 0,
             "metrics": [],
@@ -426,12 +437,17 @@ class OverviewGrid(rx.State):
 
     @staticmethod
     def _period(
-        cells: list[str] | None, indices: dict[str, int]
+        cells: list[str] | None,
+        indices: dict[str, int],
+        mapping: dict[str, str] | None = None,
     ) -> tuple[int, int] | None:
+        fixed = UploadedData._fixed_dates(mapping or {})
         dates = []
         for key, bound in (("year", 9999), ("month", 12)):
             if key not in indices:
-                dates.append(0)
+                dates.append(
+                    int(fixed[f"fixed_{key}"]) if fixed[f"fixed_{key}"] else 0
+                )
                 continue
             value = OverviewGrid._number(cells[indices[key]]) if cells else None
             if (
@@ -454,13 +470,21 @@ class OverviewGrid(rx.State):
         month: int = 0,
     ) -> tuple[Image.Image, Image.Image]:
         indices = OverviewGrid._indices(columns, mapping)
-        result["dated_year"], result["dated_month"] = (
-            "year" in indices,
-            "month" in indices,
-        )
+        fixed = UploadedData._fixed_dates(mapping)
+        for key in ("year", "month"):
+            result[f"dated_{key}"] = key in indices or bool(
+                fixed[f"fixed_{key}"]
+            )
+            result[f"{key}_source"] = (
+                f"CSV column: {mapping[key]}"
+                if key in indices
+                else f"Manual metadata for every row: {fixed[f'fixed_{key}']}"
+                if fixed[f"fixed_{key}"]
+                else "Not provided"
+            )
         chosen = (
-            year if "year" in indices else 0,
-            month if "month" in indices else 0,
+            year if result["dated_year"] else 0,
+            month if result["dated_month"] else 0,
         )
         automatic = not year and not month
         selected: list[tuple[int, str]] = []
@@ -475,7 +499,7 @@ class OverviewGrid(rx.State):
                     "This source exceeds the supported 120,000-row limit."
                 )
             cells = OverviewGrid._cells(raw, len(columns))
-            period = OverviewGrid._period(cells, indices)
+            period = OverviewGrid._period(cells, indices, mapping)
             if period is None:
                 result["invalid_dates"] += 1
                 continue
@@ -516,11 +540,11 @@ class OverviewGrid(rx.State):
             if m and y == chosen[0]
         ]
         result["chart_reason"] = (
-            "Not available · month column not mapped"
-            if "month" not in indices
+            "Not available · month column not mapped and no manual month provided"
+            if not result["dated_month"]
             else "Not available · concentration column not mapped"
             if "sea_ice_concentration" not in indices
-            else "Not available · fewer than two months with valid concentration readings (0–100%)"
+            else "Not available · fewer than two observed months with valid concentration readings (0–100%). A fixed month supplies one month only; no seasonal series is synthesized."
             if len(result["monthly"]) < 2
             else ""
         )
@@ -720,7 +744,9 @@ class OverviewGrid(rx.State):
         if not result["valid"]:
             result["status"] = "empty"
             result["message"] = (
-                "The selected period has saved rows, but no valid readings for the selected mapped measurement. Empty or invalid cells remain transparent."
+                "All rows in the selected period have invalid pixel coordinates or malformed cells. Latitude/longitude are not pixel x/y. x must be integer 1–316 and y integer 1–332. Map valid pixel-coordinate columns in Data; row-order generation needs exactly 104,912 rows (332 × 316) with intact positions. No geographic conversion or automatic data changes are performed."
+                if result["invalid_coordinates"] == result["period_rows"]
+                else "The selected period has saved rows, but no valid readings for the selected mapped measurement. Empty or invalid cells remain transparent."
             )
             return result
         token = uuid4().hex
@@ -880,6 +906,14 @@ class OverviewGrid(rx.State):
                     if (
                         result["source_id"] != self.source_id
                         or not result["dated_month"]
+                        or len(
+                            {
+                                p["month"]
+                                for p in result["periods"]
+                                if p["year"] == result["year"] and p["month"]
+                            }
+                        )
+                        < 2
                     ):
                         self.playing = False
                         self.play_id += 1
@@ -892,6 +926,8 @@ class OverviewGrid(rx.State):
                         result["dated_year"],
                         result["dated_month"],
                     )
+                    self.year_source = result["year_source"]
+                    self.month_source = result["month_source"]
                     self.invalid_dates, self.period_rows = (
                         result["invalid_dates"],
                         result["period_rows"],
@@ -986,7 +1022,10 @@ class OverviewGrid(rx.State):
                 query.execution_options(yield_per=1000)
             ):
                 cells = OverviewGrid._cells(raw, len(columns))
-                if OverviewGrid._period(cells, indices) != (year, month):
+                if OverviewGrid._period(cells, indices, mapping) != (
+                    year,
+                    month,
+                ):
                     continue
                 if OverviewGrid._coordinate(
                     position, cells, indices, mapping["coordinate_mode"]
@@ -1035,6 +1074,20 @@ class OverviewGrid(rx.State):
                         {
                             "label": f"{key.title()} · optional CSV metadata",
                             "value": display,
+                        }
+                    )
+            observed_period = OverviewGrid._period(found, indices, mapping)
+            for key, value in zip(("year", "month"), observed_period or (0, 0)):
+                if value:
+                    provenance = (
+                        f"CSV column: {mapping[key]}"
+                        if key in indices
+                        else "Manual metadata for every row"
+                    )
+                    details.append(
+                        {
+                            "label": f"{key.title()} · {provenance}",
+                            "value": str(value),
                         }
                     )
             heading = f"Saved observation at x={x}, y={y}."

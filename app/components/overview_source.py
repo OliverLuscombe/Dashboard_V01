@@ -36,6 +36,35 @@ def mapping_select(field: MappingField) -> rx.Component:
     )
 
 
+def fixed_date_input(
+    name: str, label: str, value: rx.Var, help_text: str
+) -> rx.Component:
+    return rx.el.div(
+        rx.el.label(
+            label,
+            html_for=name,
+            class_name="mb-1 block text-[11px] font-medium text-slate-600",
+        ),
+        rx.el.input(
+            id=name,
+            name=name,
+            type="text",
+            input_mode="numeric",
+            default_value=value,
+            key=value,
+            aria_describedby=f"{name}-help",
+            disabled=D.source_saving | D.loading | D.importing,
+            class_name="min-h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus-visible:outline-2 focus-visible:outline-sky-700",
+        ),
+        rx.el.p(
+            help_text,
+            id=f"{name}-help",
+            class_name="mt-1 text-[10px] leading-relaxed text-slate-600",
+        ),
+        class_name="min-w-0",
+    )
+
+
 def active_mapping_row(field: MappingField) -> rx.Component:
     return rx.el.div(
         rx.el.dt(field["label"], class_name="text-[10px] text-slate-500"),
@@ -86,7 +115,7 @@ def active_source() -> rx.Component:
             class_name="flex flex-wrap items-center justify-between gap-3",
         ),
         rx.el.p(
-            "A CSV is designated for Overview only when you explicitly apply it. Return to Overview to render its mapped readings on the 316-column × 332-row pixel grid and inspect saved pixels. Refresh the Overview map after editing data. Mapped years/months filter the grid, summaries and inspector. Monthly concentration analysis requires mapped month and concentration columns with at least two observed months; other demo pages remain synthetic.",
+            "A CSV is designated for Overview only when you explicitly apply it. Return to Overview to render its mapped readings on the 316-column × 332-row pixel grid and inspect saved pixels. Refresh the Overview map after editing data. CSV-mapped dates or manual date metadata filter the grid, summaries and inspector. Monthly concentration analysis requires concentration readings in at least two observed months. A fixed month gives one month only; other demo pages remain synthetic.",
             class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
         ),
         rx.cond(
@@ -140,7 +169,7 @@ def source_configuration() -> rx.Component:
             class_name="flex flex-wrap items-center gap-3",
         ),
         rx.el.p(
-            "Map your CSV headers to the fields below. Suggestions ignore case, spaces and punctuation; arbitrary headers can be selected manually. Review units before applying. Year and month must be numeric integers (year 1–9999, month 1–12); invalid mapped dates are excluded. Either date column may be omitted, and no date columns gives an undated snapshot. Missing measurements and dates may be Not provided; no values or latitude/longitude metadata will be invented. A CSV has at most 10 columns, so not every field can be present together.",
+            "Map your CSV headers to the fields below. Suggestions ignore case, spaces and punctuation; arbitrary headers can be selected manually. Review units before applying. For each date field, choose a CSV column OR enter one manual value for every row OR leave both blank/Not provided — never both sources. Year must be integer 1–9999; month integer 1–12. Invalid CSV dates are excluded. With neither date provided, the source remains an undated snapshot. Manual dates are metadata in the saved Overview mapping only; CSV headers and rows are unchanged. No date is inferred from a filename and no observations are invented. A CSV has at most 10 columns.",
             class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
         ),
         rx.el.form(
@@ -183,6 +212,28 @@ def source_configuration() -> rx.Component:
             rx.el.div(
                 rx.foreach(D.mapping_fields, mapping_select),
                 class_name="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2",
+            ),
+            rx.el.fieldset(
+                rx.el.legend(
+                    "Optional manual date metadata · outside the CSV",
+                    class_name="text-[11px] font-semibold text-[#245f7e]",
+                ),
+                rx.el.div(
+                    fixed_date_input(
+                        "fixed_year",
+                        "Year for every row (optional)",
+                        D.fixed_year,
+                        "Whole number 1–9999, or blank. To use this value, set the Year CSV dropdown to Not provided.",
+                    ),
+                    fixed_date_input(
+                        "fixed_month",
+                        "Month for every row (optional)",
+                        D.fixed_month,
+                        "Whole number 1–12, or blank. To use this value, set the Month CSV dropdown to Not provided. One fixed month does not create a seasonal series.",
+                    ),
+                    class_name="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2",
+                ),
+                class_name="mt-4 rounded-md border border-slate-200 bg-[#f4f8fa] p-3",
             ),
             rx.el.div(
                 rx.el.button(

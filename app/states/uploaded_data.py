@@ -28,8 +28,8 @@ MAPPING_LABELS: dict[str, str] = {
     "sea_surface_temperature": "Sea-surface temperature (°C)",
     "wind_speed": "Wind speed (m/s)",
     "air_temperature": "Air temperature (°C)",
-    "year": "Year",
-    "month": "Month",
+    "year": "Year · CSV column",
+    "month": "Month · CSV column",
     "marginal_ice_zone": "Marginal ice zone · optional",
     "cluster": "Cluster · optional",
 }
@@ -88,6 +88,8 @@ class UploadedData(rx.State):
     active_mapping: list[MappingField] = []
     mapping_fields: list[MappingField] = []
     coordinate_mode: str = "columns"
+    fixed_year: str = ""
+    fixed_month: str = ""
     selected_source_active: bool = False
     source_error: str = ""
     source_success: str = ""
@@ -189,9 +191,36 @@ class UploadedData(rx.State):
         return ""
 
     @staticmethod
+    def _fixed_dates(mapping: dict[str, str]) -> dict[str, str]:
+        clean: dict[str, str] = {}
+        for key, bound in (("year", 9999), ("month", 12)):
+            raw = mapping.get(f"fixed_{key}", "")
+            if not isinstance(raw, str):
+                raise ValueError(
+                    f"{key.title()} for every row must be a whole-number text value from 1–{bound}, or blank. No changes were saved."
+                )
+            raw = raw.strip()
+            if raw and mapping.get(key, ""):
+                raise ValueError(
+                    f"{key.title()} has both a CSV column and a manual value. Set the {key.title()} CSV dropdown to Not provided, or clear {key.title()} for every row. Use only one source per date field. No changes were saved."
+                )
+            digits = raw.lstrip("0") or "0"
+            if raw and (
+                not re.fullmatch(r"[0-9]+", raw)
+                or len(digits) > len(str(bound))
+                or not 1 <= int(digits) <= bound
+            ):
+                raise ValueError(
+                    f"{key.title()} for every row must be an integer from 1–{bound}, or blank. Remove decimals, signs or month names and enter a whole number. No changes were saved."
+                )
+            clean[f"fixed_{key}"] = str(int(digits)) if raw else ""
+        return clean
+
+    @staticmethod
     def _validate_mapping(
         columns: list[str], row_count: int, mapping: dict[str, str]
     ) -> dict[str, str]:
+        fixed = UploadedData._fixed_dates(mapping)
         mode = mapping.get("coordinate_mode", "columns")
         if mode not in ("columns", "row_order"):
             raise ValueError("Choose a supported pixel-coordinate mode.")
@@ -215,6 +244,7 @@ class UploadedData(rx.State):
         if duplicate_error:
             raise ValueError(duplicate_error)
         clean["coordinate_mode"] = mode
+        clean.update(fixed)
         return clean
 
     @staticmethod
@@ -291,6 +321,8 @@ class UploadedData(rx.State):
         self.rename_open = False
         self.mapping_fields = []
         self.coordinate_mode = "columns"
+        self.fixed_year = ""
+        self.fixed_month = ""
         self.selected_source_active = False
         self.source_error = ""
         self.source_success = ""
@@ -333,6 +365,16 @@ class UploadedData(rx.State):
                 if active
                 else []
             )
+            if active:
+                self.active_mapping.extend(
+                    {
+                        "name": f"fixed_{key}",
+                        "label": f"{key.title()} for every row · manual metadata",
+                        "value": str(active_map.get(f"fixed_{key}", ""))
+                        or "Not provided",
+                    }
+                    for key in ("year", "month")
+                )
             if active and active_map.get("coordinate_mode") == "row_order":
                 self.active_mapping[0]["value"] = (
                     "Generated: row_position % 316 + 1"
@@ -368,6 +410,8 @@ class UploadedData(rx.State):
                 self.coordinate_mode = str(
                     saved_mapping.get("coordinate_mode", "columns")
                 )
+                self.fixed_year = str(saved_mapping.get("fixed_year", ""))
+                self.fixed_month = str(saved_mapping.get("fixed_month", ""))
                 self.selected_source_active = selected.overview_active
                 self.mapping_revision += 1
                 self.page_index = min(
@@ -579,9 +623,17 @@ class UploadedData(rx.State):
         mapping["coordinate_mode"] = str(
             form_data.get("coordinate_mode", "columns")
         )
-        self.source_error = UploadedData._duplicate_mapping_error(mapping)
+        mapping["fixed_year"] = str(form_data.get("fixed_year", ""))
+        mapping["fixed_month"] = str(form_data.get("fixed_month", ""))
+        self.source_error = ""
         self.source_success = ""
-        if self.source_error:
+        try:
+            mapping = UploadedData._validate_mapping(
+                self.columns, self.row_count, mapping
+            )
+        except ValueError as e:
+            logging.exception(f"Error: {e}")
+            self.source_error = str(e)
             return
         self.source_saving = True
         return UploadedData.persist_source(self.selected_id, mapping, False)
@@ -607,7 +659,7 @@ class UploadedData(rx.State):
                 self.source_success = (
                     "Overview source removed; its saved mapping is retained for reuse."
                     if remove
-                    else "Overview source and mapping saved. Return to Overview to view the mapped CSV pixel grid. Mapped dates filter pixels, computed summaries and inspection; monthly concentration analysis uses actual available months. Other demo pages remain synthetic."
+                    else "Overview source and mapping saved. Return to Overview to view the mapped CSV pixel grid. CSV-mapped dates or explicitly entered manual date metadata filter pixels, computed summaries and inspection; monthly concentration analysis uses actual available months. Manual metadata is saved only in the Overview mapping; CSV rows are unchanged. Other demo pages remain synthetic."
                 )
             yield UploadedData.load_catalogue
         except Exception as e:
@@ -630,9 +682,11 @@ class UploadedData(rx.State):
             for key, label in MAPPING_LABELS.items()
         ]
         self.coordinate_mode = "columns"
+        self.fixed_year = ""
+        self.fixed_month = ""
         self.mapping_revision += 1
         self.source_error = ""
-        self.source_success = "Header suggestions restored. Review them, then apply to save; nothing has changed yet."
+        self.source_success = "Header suggestions restored and manual dates cleared. Review them, then apply to save; nothing has changed yet."
 
     @rx.event
     def select_dataset(self, dataset_id: int):

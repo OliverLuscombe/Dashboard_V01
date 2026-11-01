@@ -2,6 +2,7 @@ import reflex as rx
 import unittest
 import tempfile
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -237,6 +238,147 @@ class OverviewMappingTests(unittest.TestCase):
             session.begin.return_value.__exit__.call_args.args[0], ValueError
         )
 
+    def test_fixed_dates_manual_mixed_and_legacy_canonical_mapping(self):
+        columns = ["x", "y", "year", "month"]
+        base = {"x_coordinate": "x", "y_coordinate": "y"}
+        for dates, expected in (
+            ({"fixed_year": " 02004 ", "fixed_month": "011"}, ("2004", "11")),
+            ({"fixed_year": "9999", "month": "month"}, ("9999", "")),
+            ({"year": "year", "fixed_month": "1"}, ("", "1")),
+            ({"fixed_year": "1"}, ("1", "")),
+            ({"fixed_month": "12"}, ("", "12")),
+            ({}, ("", "")),
+        ):
+            with self.subTest(dates=dates):
+                clean = UploadedData._validate_mapping(
+                    columns, 82120, base | dates
+                )
+                self.assertEqual(
+                    (clean["fixed_year"], clean["fixed_month"]), expected
+                )
+                self.assertEqual(clean["year"], dates.get("year", ""))
+                self.assertEqual(clean["month"], dates.get("month", ""))
+                self.assertEqual(
+                    UploadedData._validate_mapping(columns, 82120, clean), clean
+                )
+        self.assertEqual(
+            UploadedData._suggest_mapping(["Latitude", "Longitude"])["year"], ""
+        )
+        with self.assertRaisesRegex(ValueError, "exactly 104,912"):
+            UploadedData._validate_mapping(
+                columns, 82120, {"coordinate_mode": "row_order"}
+            )
+
+    def test_invalid_or_conflicting_fixed_dates_rejected_by_authoritative_writer(
+        self,
+    ):
+        columns = ["x", "y", "year", "month"]
+        base = {"x_coordinate": "x", "y_coordinate": "y"}
+        cases = [
+            {"fixed_year": value}
+            for value in (
+                "0",
+                "10000",
+                "2004.0",
+                "2e3",
+                "+2004",
+                "-1",
+                "NaN",
+                "year",
+                "9" * 100,
+                2004,
+            )
+        ]
+        cases.extend(
+            {"fixed_month": value}
+            for value in ("0", "13", "1.5", "November", "inf", "-1")
+        )
+        cases.extend(
+            (
+                {"year": "year", "fixed_year": "2004"},
+                {"month": "month", "fixed_month": "11"},
+            )
+        )
+        for dates in cases:
+            with self.subTest(dates=dates):
+                dataset = SimpleNamespace(
+                    column_names_json=json.dumps(columns),
+                    row_count=82120,
+                    overview_mapping_json="{}",
+                    overview_active=False,
+                )
+                session = MagicMock()
+                session.scalar.return_value = dataset
+                with patch("app.states.uploaded_data.rx.session") as factory:
+                    factory.return_value.__enter__.return_value = session
+                    with self.assertRaisesRegex(
+                        ValueError, "No changes were saved"
+                    ):
+                        UploadedData._write_source(1, base | dates, False)
+                self.assertEqual(session.execute.call_count, 1)
+                self.assertEqual(dataset.overview_mapping_json, "{}")
+                self.assertFalse(dataset.overview_active)
+
+    def test_fixed_mapping_save_reload_and_legacy_defaults_leave_rows_untouched(
+        self,
+    ):
+        dataset = SimpleNamespace(
+            id=1,
+            name="No filename inference",
+            original_filename="200411.csv",
+            row_count=82120,
+            created_at=datetime.now(UTC),
+            overview_active=False,
+            column_names_json=json.dumps(["x", "y", "ice"]),
+            overview_mapping_json="{}",
+        )
+        session = MagicMock()
+        session.scalar.return_value = dataset
+        session.scalars.return_value.all.side_effect = [
+            [dataset],
+            [],
+            [dataset],
+            [],
+        ]
+        mapping = {
+            "x_coordinate": "x",
+            "y_coordinate": "y",
+            "sea_ice_concentration": "ice",
+            "fixed_year": " 02004 ",
+            "fixed_month": "011",
+        }
+        with patch("app.states.uploaded_data.rx.session") as factory:
+            factory.return_value.__enter__.return_value = session
+            UploadedData._write_source(1, mapping, False)
+            saved = json.loads(dataset.overview_mapping_json)
+            self.assertEqual(saved["fixed_year"], "2004")
+            self.assertEqual(saved["fixed_month"], "11")
+            self.assertEqual(session.execute.call_count, 2)
+            session.add.assert_not_called()
+            state = UploadedData()
+            state._reload()
+            self.assertEqual(
+                (state.fixed_year, state.fixed_month), ("2004", "11")
+            )
+            active = {field["name"]: field for field in state.active_mapping}
+            self.assertIn("manual metadata", active["fixed_year"]["label"])
+            self.assertEqual(active["fixed_month"]["value"], "11")
+            dataset.overview_mapping_json = json.dumps(
+                {k: v for k, v in saved.items() if not k.startswith("fixed_")}
+            )
+            state._reload()
+            self.assertEqual((state.fixed_year, state.fixed_month), ("", ""))
+            self.assertEqual(dataset.row_count, 82120)
+            self.assertEqual(
+                dataset.column_names_json, json.dumps(["x", "y", "ice"])
+            )
+        state.fixed_year, state.fixed_month = "2004", "11"
+        UploadedData.suggest_source.fn(state)
+        self.assertEqual((state.fixed_year, state.fixed_month), ("", ""))
+        state.fixed_year, state.fixed_month = "2004", "11"
+        state._clear_selection()
+        self.assertEqual((state.fixed_year, state.fixed_month), ("", ""))
+
     def test_pixel_order_boundaries(self):
         for position, expected in [
             (0, (1, 332)),
@@ -377,10 +519,56 @@ class OverviewMappingEventTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state.source_error, "")
         expected = {field: form.get(field, "") for field in MAPPING_LABELS}
         expected["coordinate_mode"] = "columns"
+        expected["fixed_year"] = ""
+        expected["fixed_month"] = ""
         save.assert_called_once_with(1, expected, False)
         self.assertEqual(
             UploadedData._validate_mapping(state.columns, 3, expected), expected
         )
+
+    async def test_fixed_dates_form_rejects_before_background_save(self):
+        for dates in (
+            {"fixed_year": "10000"},
+            {"fixed_year": "2004.0"},
+            {"fixed_month": "13"},
+            {"fixed_month": "November"},
+            {"year": "Year", "fixed_year": "2004"},
+            {"month": "Month", "fixed_month": "11"},
+        ):
+            with self.subTest(dates=dates):
+                state = self._make_state(["x", "y", "Year", "Month"], 82120)
+                form = {"x_coordinate": "x", "y_coordinate": "y"} | dates
+                with patch.object(UploadedData, "persist_source") as save:
+                    await run_event(state.apply_source, form)
+                save.assert_not_called()
+                self.assertFalse(state.source_saving)
+                self.assertIn("No changes were saved", state.source_error)
+                with self.assertRaises(ValueError) as error:
+                    UploadedData._validate_mapping(state.columns, 82120, form)
+                self.assertEqual(state.source_error, str(error.exception))
+
+    async def test_fixed_dates_pass_canonically_to_save(self):
+        state = self._make_state(["x", "y", "Month"], 82120)
+        for dates in (
+            {"fixed_year": " 02004 ", "fixed_month": "011"},
+            {"fixed_year": "2004", "month": "Month"},
+        ):
+            state.source_saving = False
+            with patch.object(
+                UploadedData, "persist_source", return_value=None
+            ) as save:
+                await run_event(
+                    state.apply_source,
+                    {"x_coordinate": "x", "y_coordinate": "y"} | dates,
+                )
+            self.assertTrue(state.source_saving)
+            self.assertEqual(state.source_error, "")
+            submitted = save.call_args.args[1]
+            self.assertEqual(submitted["fixed_year"], "2004")
+            self.assertEqual(
+                submitted["fixed_month"], "11" if "fixed_month" in dates else ""
+            )
+            self.assertEqual(submitted["month"], dates.get("month", ""))
 
     async def test_row_order_ignores_duplicate_coordinate_selections(self):
         form = {

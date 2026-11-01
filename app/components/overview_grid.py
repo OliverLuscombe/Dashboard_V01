@@ -47,17 +47,32 @@ def uploaded_period_controls() -> rx.Component:
         rx.cond(
             G.dated_year,
             uploaded_period_select(
-                "Year", G.selected_year.to_string(), G.years, G.choose_year
+                rx.cond(
+                    G.year_source.startswith("Manual"),
+                    "Year · manual metadata",
+                    "Year · CSV",
+                ),
+                G.selected_year.to_string(),
+                G.years,
+                G.choose_year,
             ),
         ),
         rx.cond(
             G.dated_month,
             uploaded_period_select(
-                "Month · CSV number",
+                rx.cond(
+                    G.month_source.startswith("Manual"),
+                    "Month · manual metadata",
+                    "Month · CSV number",
+                ),
                 G.selected_month.to_string(),
                 G.months,
                 G.choose_month,
             ),
+        ),
+        rx.el.p(
+            f"Year: {G.year_source} · Month: {G.month_source}",
+            class_name="w-full text-[10px] leading-relaxed text-slate-600",
         ),
         class_name="flex flex-wrap items-center gap-3 self-start pt-5",
     )
@@ -72,7 +87,7 @@ def uploaded_timeline() -> rx.Component:
                 class_name="text-xs font-semibold text-slate-700",
             ),
             rx.el.span(
-                "SAVED CSV PERIOD",
+                "SAVED SOURCE PERIOD",
                 class_name="text-[9px] tracking-wider text-slate-600",
             ),
             class_name="flex flex-wrap items-center gap-2",
@@ -81,7 +96,7 @@ def uploaded_timeline() -> rx.Component:
             rx.el.button(
                 rx.icon("skip-back", class_name="h-3.5 w-3.5"),
                 on_click=G.step_month(-1),
-                aria_label="Previous available CSV month",
+                aria_label="Previous observed month",
                 disabled=(~G.dated_month)
                 | (G.months.length() < 2)
                 | (G.status == "loading"),
@@ -93,14 +108,14 @@ def uploaded_timeline() -> rx.Component:
                     class_name="h-3.5 w-3.5",
                 ),
                 on_click=G.toggle_play,
-                aria_label="Play or pause available CSV months",
+                aria_label="Play or pause observed months",
                 disabled=(~G.dated_month) | (G.months.length() < 2),
                 class_name=BUTTON,
             ),
             rx.el.button(
                 rx.icon("skip-forward", class_name="h-3.5 w-3.5"),
                 on_click=G.step_month(1),
-                aria_label="Next available CSV month",
+                aria_label="Next observed month",
                 disabled=(~G.dated_month)
                 | (G.months.length() < 2)
                 | (G.status == "loading"),
@@ -125,8 +140,12 @@ def uploaded_timeline() -> rx.Component:
         rx.el.p(
             rx.cond(
                 G.dated_month,
-                "Only months present in valid mapped CSV dates are offered. Playback steps available months in the selected year; it does not infer missing observations.",
-                "Month stepping and playback unavailable · month column not mapped.",
+                rx.cond(
+                    G.months.length() < 2,
+                    "Playback unavailable · fewer than two observed months in the selected year. A fixed month provides one month only; no missing observations or seasonal series are synthesized.",
+                    "Only observed months from CSV dates or explicit manual metadata are offered. Playback steps available months in the selected year; it does not infer missing observations.",
+                ),
+                "Month stepping and playback unavailable · month column not mapped and no manual month provided.",
             ),
             class_name="mt-2 text-[10px] leading-relaxed text-slate-600",
         ),
@@ -161,8 +180,8 @@ def uploaded_seasonal() -> rx.Component:
             rx.el.p(
                 rx.cond(
                     G.dated_year,
-                    f"Chosen year · {G.selected_year}",
-                    "All saved months · year column not mapped",
+                    f"Chosen year · {G.selected_year} · {G.year_source}",
+                    "All saved months · year column not mapped and no manual year provided",
                 ),
                 class_name="mt-1 text-[11px] text-[#245f7e]",
             ),
@@ -180,7 +199,7 @@ def uploaded_seasonal() -> rx.Component:
                         width=2.5,
                     ),
                     xy.scatter("month", "mean", color="#245f7e", size=5),
-                    xy.x_axis(label="Mapped month · 1–12"),
+                    xy.x_axis(label="Observed month · 1–12"),
                     xy.y_axis(label="Mean concentration (%)"),
                     xy.modebar(False),
                     xy.interaction_config(navigation=False),
@@ -531,7 +550,7 @@ def uploaded_overview() -> rx.Component:
                     class_name="text-xs font-semibold text-[#183d54]",
                 ),
                 rx.el.p(
-                    "Mapped valid dates select the same period for pixels, cards and inspection. The monthly chart uses actual concentration observations within the chosen year, or all months when year is not mapped. No inferred area, missing values or model results are added; other demo pages remain synthetic.",
+                    "CSV-mapped valid dates or explicit manual date metadata select the same period for pixels, cards and inspection. The monthly chart uses actual concentration observations within the chosen year, or all months when no year is provided. A fixed month supplies only one observed month, not a seasonal series. Manual metadata does not change CSV rows. No inferred area, missing values or model results are added; other demo pages remain synthetic.",
                     class_name="mt-1 text-[11px] leading-relaxed text-slate-600",
                 ),
             ),

@@ -278,14 +278,18 @@ class OverviewPeriodTests(unittest.TestCase):
             self.assertEqual(image.getpixel(pixel)[3], 255)
         self.assertLess(len(json.dumps(result)), 4000)
 
-    def database(self, records=RECORDS):
+    def database(self, records=RECORDS, mapping=None, columns=None):
         dataset = UploadedDataset(
             id=7,
             name="Saved observations",
             row_count=len(records),
             overview_active=True,
-            column_names_json=json.dumps(COLUMNS),
-            overview_mapping_json=json.dumps(MAPPING),
+            column_names_json=json.dumps(
+                COLUMNS if columns is None else columns
+            ),
+            overview_mapping_json=json.dumps(
+                MAPPING if mapping is None else mapping
+            ),
         )
         session = MagicMock()
         session.scalar.return_value = dataset
@@ -293,6 +297,256 @@ class OverviewPeriodTests(unittest.TestCase):
             (i, json.dumps(row)) for i, row in enumerate(records)
         ]
         return session
+
+    def test_manual_only_dates_apply_to_every_row_cards_and_single_observed_month(
+        self,
+    ):
+        columns = ["x", "y", "ice"]
+        mapping = {
+            "coordinate_mode": "columns",
+            "x_coordinate": "x",
+            "y_coordinate": "y",
+            "sea_ice_concentration": "ice",
+            "fixed_year": "2004",
+            "fixed_month": "11",
+        }
+        rows = [["1", "332", "10"], ["316", "1", "30"]]
+        result, image, _ = self.scan(
+            rows=rows, columns=columns, mapping=mapping
+        )
+        self.assertEqual(result["periods"], [{"year": 2004, "month": 11}])
+        self.assertEqual((result["year"], result["month"]), (2004, 11))
+        self.assertTrue(result["dated_year"] and result["dated_month"])
+        self.assertEqual(result["period_rows"], 2)
+        self.assertEqual(result["invalid_dates"], 0)
+        self.assertEqual(result["metrics"][0]["value"], "20.00 %")
+        self.assertEqual(
+            result["monthly"], [{"month": 11, "mean": 20.0, "count": 2}]
+        )
+        self.assertIn("fewer than two observed months", result["chart_reason"])
+        self.assertIn("Manual metadata", result["year_source"])
+        self.assertIn("Manual metadata", result["month_source"])
+        self.assertEqual(image.getpixel((315, 331))[3], 255)
+        indices = G._indices(columns, mapping)
+        self.assertNotIn("fixed_year", indices)
+        self.assertNotIn("fixed_month", indices)
+        self.assertEqual(G._period(rows[0], indices, mapping), (2004, 11))
+        self.assertEqual(G._period(rows[0], indices), (0, 0))
+        with self.assertRaisesRegex(
+            ValueError, "both a CSV column and a manual value"
+        ):
+            G._period(rows[0], indices, mapping | {"year": "x"})
+        absent, _, _ = self.scan(
+            rows=rows, columns=columns, mapping=mapping, year=2004, month=12
+        )
+        self.assertEqual(absent["period_rows"], 0)
+        state = G()
+        state.status = "ready"
+        state.periods = result["periods"]
+        state.dated_year = state.dated_month = True
+        state.selected_year, state.selected_month = 2004, 11
+        self.assertEqual(state.years, ["2004"])
+        self.assertEqual(state.months, ["11"])
+        self.assertEqual(state.period_label, "November 2004")
+        G.toggle_play.fn(state)
+        self.assertFalse(state.playing)
+        G.step_month.fn(state, 1)
+        G.choose_month.fn(state, "12")
+        G.choose_year.fn(state, "2005")
+        self.assertEqual(
+            (state.selected_year, state.selected_month), (2004, 11)
+        )
+
+    def test_mixed_manual_csv_dates_and_partial_metadata(self):
+        base = {
+            "coordinate_mode": "columns",
+            "x_coordinate": "x",
+            "y_coordinate": "y",
+            "sea_ice_concentration": "ice",
+        }
+        columns = ["x", "y", "ice", "date"]
+        rows = [["1", "332", "10", "3"], ["1", "332", "80", "7"]]
+        mapping = base | {"fixed_year": "2004", "month": "date"}
+        result, _, _ = self.scan(
+            rows=rows, columns=columns, mapping=mapping, year=2004, month=7
+        )
+        self.assertEqual(
+            result["periods"],
+            [{"year": 2004, "month": 3}, {"year": 2004, "month": 7}],
+        )
+        self.assertEqual(result["metrics"][0]["value"], "80.00 %")
+        self.assertEqual([m["month"] for m in result["monthly"]], [3, 7])
+        self.assertEqual(result["chart_reason"], "")
+        self.assertEqual(result["month_source"], "CSV column: date")
+        rows = [["1", "332", "10", "2004"], ["1", "332", "80", "2005"]]
+        mapping = base | {"year": "date", "fixed_month": "11"}
+        result, _, _ = self.scan(
+            rows=rows, columns=columns, mapping=mapping, year=2005, month=11
+        )
+        self.assertEqual(
+            result["periods"],
+            [{"year": 2004, "month": 11}, {"year": 2005, "month": 11}],
+        )
+        self.assertEqual(result["metrics"][0]["value"], "80.00 %")
+        self.assertEqual(
+            result["monthly"], [{"month": 11, "mean": 80.0, "count": 1}]
+        )
+        self.assertEqual(result["year_source"], "CSV column: date")
+        for dates, expected in (
+            ({"fixed_year": "2004"}, (2004, 0)),
+            ({"fixed_month": "11"}, (0, 11)),
+            ({}, (0, 0)),
+        ):
+            with self.subTest(dates=dates):
+                result, _, _ = self.scan(
+                    rows=rows, columns=columns, mapping=base | dates
+                )
+                self.assertEqual((result["year"], result["month"]), expected)
+                self.assertEqual(result["invalid_dates"], 0)
+                self.assertEqual(result["period_rows"], len(rows))
+                self.assertEqual(result["dated_year"], bool(expected[0]))
+                self.assertEqual(result["dated_month"], bool(expected[1]))
+
+    def test_manual_saved_render_and_inspector_use_identical_period_logic(self):
+        columns = ["x", "y", "ice", "date"]
+        base = {
+            "coordinate_mode": "columns",
+            "x_coordinate": "x",
+            "y_coordinate": "y",
+            "sea_ice_concentration": "ice",
+        }
+        cases = (
+            (
+                {"fixed_year": "2004", "fixed_month": "11"},
+                ["unused"],
+                [(2004, 11, "10")],
+            ),
+            (
+                {"fixed_year": "2004", "month": "date"},
+                ["3", "7"],
+                [(2004, 3, "10"), (2004, 7, "80")],
+            ),
+            (
+                {"year": "date", "fixed_month": "11"},
+                ["2004", "2005"],
+                [(2004, 11, "10"), (2005, 11, "80")],
+            ),
+            ({"fixed_month": "11"}, ["unused"], [(0, 11, "10")]),
+            ({"fixed_year": "2004"}, ["unused"], [(2004, 0, "10")]),
+            ({}, ["unused"], [(0, 0, "10")]),
+        )
+        for dates, values, periods in cases:
+            with self.subTest(dates=dates):
+                mapping = base | dates
+                rows = [
+                    ["1", "332", ice, value]
+                    for ice, value in zip(("10", "80"), values)
+                ]
+                session = self.database(rows, mapping=mapping, columns=columns)
+                with (
+                    tempfile.TemporaryDirectory() as directory,
+                    patch("app.states.overview_grid.rx.session") as factory,
+                    patch(
+                        "app.states.overview_grid.rx.get_upload_dir",
+                        return_value=Path(directory),
+                    ),
+                ):
+                    factory.return_value.__enter__.return_value = session
+                    for year, month, reading in periods:
+                        result = G._render("", year, month, 7)
+                        self.assertEqual(result["status"], "ready")
+                        self.assertEqual(
+                            (result["year"], result["month"]), (year, month)
+                        )
+                        self.assertEqual(
+                            result["metrics"][0]["value"],
+                            f"{float(reading):.2f} %",
+                        )
+                        heading, details = G._lookup(
+                            7, "sea_ice_concentration", 1, 332, year, month
+                        )
+                        self.assertIn("Saved observation", heading)
+                        self.assertEqual(details[0]["value"], reading)
+                        for key in ("year", "month"):
+                            date_details = [
+                                detail
+                                for detail in details
+                                if detail["label"].startswith(
+                                    f"{key.title()} ·"
+                                )
+                            ]
+                            if dates.get(f"fixed_{key}"):
+                                self.assertEqual(
+                                    date_details[0]["value"],
+                                    dates[f"fixed_{key}"],
+                                )
+                                self.assertIn(
+                                    "Manual metadata", date_details[0]["label"]
+                                )
+                            elif dates.get(key):
+                                self.assertIn(
+                                    "CSV column", date_details[0]["label"]
+                                )
+                            else:
+                                self.assertEqual(date_details, [])
+                    heading, details = G._lookup(
+                        7, "sea_ice_concentration", 1, 332, 2006, 12
+                    )
+                    self.assertIn("No observation", heading)
+                    self.assertEqual(details, [])
+
+    def test_invalid_manual_saved_mappings_are_errors_not_date_counters(self):
+        for dates in (
+            {"fixed_year": "2004"},
+            {"fixed_month": "11"},
+            {"year": "", "fixed_year": "10000"},
+            {"month": "", "fixed_month": "1.5"},
+        ):
+            with (
+                self.subTest(dates=dates),
+                patch("app.states.overview_grid.rx.session") as factory,
+            ):
+                factory.return_value.__enter__.return_value = self.database(
+                    mapping=MAPPING | dates
+                )
+                result = G._render("")
+                self.assertEqual(result["status"], "error")
+                self.assertEqual(result["invalid_dates"], 0)
+                self.assertEqual(result["invalid_coordinates"], 0)
+                with self.assertRaises(ValueError):
+                    G._lookup(7, "sea_ice_concentration", 1, 332, 2004, 11)
+
+    def test_geographic_coordinates_empty_map_has_actionable_pixel_message(
+        self,
+    ):
+        columns = ["Latitude", "Longitude", "Concentration"]
+        mapping = {
+            "coordinate_mode": "columns",
+            "x_coordinate": "Latitude",
+            "y_coordinate": "Longitude",
+            "sea_ice_concentration": "Concentration",
+            "fixed_year": "2004",
+            "fixed_month": "11",
+        }
+        records = [["-39.36487", "-42.23257", "0"]] * 82120
+        with patch("app.states.overview_grid.rx.session") as factory:
+            factory.return_value.__enter__.return_value = self.database(
+                records, mapping, columns
+            )
+            result = G._render("")
+        self.assertEqual(result["status"], "empty")
+        self.assertEqual(result["total"], 82120)
+        self.assertEqual(result["period_rows"], 82120)
+        self.assertEqual(result["invalid_coordinates"], 82120)
+        self.assertEqual(result["invalid_dates"], 0)
+        self.assertEqual(result["invalid_readings"], 0)
+        self.assertEqual(result["duplicates"], 0)
+        self.assertEqual(result["valid"], 0)
+        self.assertIn("Latitude/longitude are not pixel x/y", result["message"])
+        self.assertIn(
+            "x must be integer 1–316 and y integer 1–332", result["message"]
+        )
+        self.assertIn("exactly 104,912", result["message"])
 
     def test_saved_render_switch_and_inspector_same_period(self):
         session = self.database()
