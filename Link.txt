@@ -1,0 +1,26 @@
+http://localhost:3028/
+
+How to stop the app manually
+
+If the app is running in a terminal, press **Ctrl+C** in that terminal.
+
+If you’ve closed the terminal, the most recent app was using port **3028**. In PowerShell, find its process ID:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3028 -State Listen |
+  Select-Object -ExpandProperty OwningProcess -Unique
+```
+
+Then stop that specific process, replacing `<PID>` with the number returned:
+
+```powershell
+Stop-Process -Id <PID>
+```
+
+If you started the app on a different port, replace `3028` with that port.
+
+Startup code:
+
+cd "C:\Users\kitty\Documents\ICT assignment\antarctic_sea_ice_dashboard"
+>> $env:REFLEX_DB_URL = "sqlite:///C:/Users/kitty/Documents/ICT assignment/antarctic_sea_ice_dashboard/globe_check.db"
+>> py -3.13 -m reflex run --env prod --frontend-port 3028 --backend-port 3028 --single-port
