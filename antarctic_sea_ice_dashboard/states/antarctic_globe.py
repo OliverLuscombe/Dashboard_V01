@@ -396,20 +396,22 @@ class AntarcticGlobe(rx.State):
 
     @rx.event(background=True)
     async def toggle_layer(self, dataset_id: int):
-        layer = next(
-            (item for item in self.layers if item["id"] == dataset_id), None
-        )
-        if layer is None:
-            return
-        self.request_id += 1
-        request_id = self.request_id
-        self.status = "loading"
+        async with self:
+            layer = next(
+                (item for item in self.layers if item["id"] == dataset_id), None
+            )
+            if layer is None:
+                return
+            active = layer["active"]
+            self.request_id += 1
+            request_id = self.request_id
+            self.status = "loading"
+            self.message = "Updating active CSV layers…"
         try:
             await asyncio.to_thread(
-                UploadedData._set_layer_active, dataset_id, not layer["active"]
+                UploadedData._set_layer_active, dataset_id, not active
             )
             async with self:
-                self.message = "Updating active CSV layers…"
                 selected_group = self.selected_group
                 measurement_key = self.measurement_key
             yield UploadedData.load_catalogue

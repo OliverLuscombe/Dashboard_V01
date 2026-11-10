@@ -24,3 +24,6 @@ Startup code:
 cd "C:\Users\kitty\Documents\ICT assignment\antarctic_sea_ice_dashboard"
 >> $env:REFLEX_DB_URL = "sqlite:///C:/Users/kitty/Documents/ICT assignment/antarctic_sea_ice_dashboard/globe_check.db"
 >> py -3.13 -m reflex run --env prod --frontend-port 3028 --backend-port 3028 --single-port
+
+Reflex server URL:
+https://execute-text-file-prompt-red-orca.reflex.run
