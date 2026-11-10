@@ -1,7 +1,9 @@
 import reflex as rx
 import reflex_xy as xy
 from antarctic_sea_ice_dashboard.states.explorer import Explorer as S
-from antarctic_sea_ice_dashboard.components.uploaded_data import uploaded_workspace
+from antarctic_sea_ice_dashboard.components.uploaded_data import (
+    uploaded_workspace,
+)
 from antarctic_sea_ice_dashboard.components.antarctic_globe import globe_map
 from antarctic_sea_ice_dashboard.components.snapshot_comparison import (
     snapshot_comparison,
@@ -1071,7 +1073,9 @@ def model() -> rx.Component:
     return rx.el.div(
         globe_map(),
         rx.el.section(
-            rx.icon("info", class_name="mt-0.5 h-4 w-4 shrink-0 text-[#286180]"),
+            rx.icon(
+                "info", class_name="mt-0.5 h-4 w-4 shrink-0 text-[#286180]"
+            ),
             rx.el.div(
                 rx.el.h2(
                     "No uploaded model output is available",
@@ -1210,7 +1214,7 @@ def about() -> rx.Component:
                     class_name="text-lg font-medium text-slate-800",
                 ),
                 rx.el.p(
-                    "The Data tab accepts UTF-8 CSVs with up to 120,000 data rows and 10 columns, with a 20 MB (20 × 1,024 × 1,024 bytes) per-file cap. A Year and Month are required before each import and are saved as snapshot metadata for every row in that file. Import, preview, edit, add or delete rows and rename or delete datasets. Map geographic coordinates and numeric measurements, then apply or remove CSV layers; multiple layers can be active in the same snapshot. Changes and mappings persist after refresh.",
+                    "The Data tab accepts UTF-8 CSVs with up to 400,000 data rows and 10 columns, with a 20 MB (20 × 1,024 × 1,024 bytes) per-file cap. A Year and Month are required before each import and are saved as snapshot metadata for every row in that file. Import, preview, edit, add or delete rows and rename or delete datasets. Map geographic coordinates and numeric measurements, then apply or remove CSV layers; multiple layers can be active in the same snapshot. Changes and mappings persist after refresh.",
                     class_name="mt-3 text-sm leading-7 text-slate-600",
                 ),
                 rx.el.p(

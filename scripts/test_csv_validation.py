@@ -23,7 +23,7 @@ class CsvValidationTests(unittest.TestCase):
         )
 
     def test_csv_limits_and_header_only_files(self):
-        self.assertEqual(MAX_ROWS, 120000)
+        self.assertEqual(MAX_ROWS, 400000)
         self.assertEqual(MAX_BYTES, 20 * 1024 * 1024)
         self.assertEqual(MAX_COLUMNS, 10)
         self.assertEqual(
@@ -44,21 +44,28 @@ class CsvValidationTests(unittest.TestCase):
         self.assertEqual(columns, ["a"])
         self.assertEqual(len(rows), MAX_ROWS)
 
+    def test_accepts_full_bundled_wind_row_count(self):
+        columns, rows = UploadedData._parse_csv(
+            "201605_10m_wind_speed.csv",
+            b"Latitude,Longitude,wind_speed\n" + b"-30,-180,007.50\n" * 347040,
+        )
+        self.assertEqual(columns, ["Latitude", "Longitude", "wind_speed"])
+        self.assertEqual(len(rows), 347040)
+        self.assertEqual(rows[-1], ["-30", "-180", "007.50"])
+
     def test_rejects_csv_over_each_size_limit(self):
         with self.assertRaisesRegex(ValueError, "at most 10 columns"):
             UploadedData._parse_csv(
                 "too-many-columns.csv",
                 f"{','.join(f'c{i}' for i in range(MAX_COLUMNS + 1))}\n".encode(),
             )
-        with self.assertRaisesRegex(ValueError, "120,000"):
+        with self.assertRaisesRegex(ValueError, "400,000"):
             UploadedData._parse_csv(
                 "too-many-rows.csv",
                 f"a\n{'1\n' * (MAX_ROWS + 1)}".encode(),
             )
         with self.assertRaisesRegex(ValueError, "20 MB"):
-            UploadedData._parse_csv(
-                "too-large.csv", b"a\n" + b"x" * MAX_BYTES
-            )
+            UploadedData._parse_csv("too-large.csv", b"a\n" + b"x" * MAX_BYTES)
 
     def test_preserves_leading_zeroes_and_rejects_malformed_rows(self):
         self.assertEqual(
@@ -70,7 +77,7 @@ class CsvValidationTests(unittest.TestCase):
             b"a,b\n1\n",
             b"a\n1,2\n",
             b"a\n\n",
-            b"a\n\"unclosed",
+            b'a\n"unclosed',
         ):
             with self.subTest(data=data), self.assertRaises(ValueError):
                 UploadedData._parse_csv("invalid.csv", data)
@@ -113,7 +120,9 @@ class CsvValidationTests(unittest.TestCase):
 
 
 class GeographicMappingTests(unittest.TestCase):
-    def test_header_suggestions_only_use_geographic_and_measurement_fields(self):
+    def test_header_suggestions_only_use_geographic_and_measurement_fields(
+        self,
+    ):
         columns = [
             "Latitude",
             "Longitude",
@@ -127,15 +136,15 @@ class GeographicMappingTests(unittest.TestCase):
         mapping = UploadedData._suggest_mapping(columns)
         self.assertEqual(mapping["latitude"], "Latitude")
         self.assertEqual(mapping["longitude"], "Longitude")
-        self.assertEqual(
-            mapping["sea_ice_concentration"], columns[2]
-        )
+        self.assertEqual(mapping["sea_ice_concentration"], columns[2])
         self.assertEqual(mapping["sea_surface_temperature"], columns[3])
         self.assertEqual(mapping["wind_speed"], columns[4])
         self.assertEqual(mapping["air_temperature"], columns[5])
         self.assertEqual(set(mapping), set(MAPPING_LABELS))
 
-    def test_mapping_requires_latitude_longitude_and_supported_measurement(self):
+    def test_mapping_requires_latitude_longitude_and_supported_measurement(
+        self,
+    ):
         columns = ["Lat", "Lon", "Concentration", "SST"]
         mapping = {
             "latitude": "Lat",
@@ -182,9 +191,7 @@ class GeographicMappingTests(unittest.TestCase):
             {"fixed_year": "2024", "fixed_month": "13"},
         ):
             with self.subTest(fixed=fixed), self.assertRaises(ValueError):
-                UploadedData._validate_mapping(
-                    columns, 1, mapping | fixed
-                )
+                UploadedData._validate_mapping(columns, 1, mapping | fixed)
 
     def test_rejects_missing_or_duplicate_mapped_columns(self):
         columns = ["Lat", "Lon", "Value"]

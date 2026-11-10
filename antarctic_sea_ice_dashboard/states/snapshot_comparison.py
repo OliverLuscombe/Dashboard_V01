@@ -8,14 +8,17 @@ from uuid import uuid4
 import reflex as rx
 from sqlalchemy import select
 
-from antarctic_sea_ice_dashboard.models import UploadedDataset, UploadedDatasetRow
+from antarctic_sea_ice_dashboard.models import (
+    UploadedDataset,
+    UploadedDatasetRow,
+)
 from antarctic_sea_ice_dashboard.states.antarctic_globe import (
-    MAX_ROWS,
     MEASUREMENT_FIELDS,
     AntarcticGlobe,
 )
 from antarctic_sea_ice_dashboard.states.uploaded_data import (
     DatasetSummary,
+    MAX_ROWS,
     UploadedData,
 )
 
@@ -107,17 +110,13 @@ class SnapshotComparison(rx.State):
             for position, (raw,) in enumerate(rows, start=1):
                 if position > MAX_ROWS:
                     raise ValueError(
-                        f"CSV layer {summary['name']} exceeds the supported 120,000-row limit."
+                        f"CSV layer {summary['name']} exceeds the supported {MAX_ROWS:,}-row limit."
                     )
                 cells = AntarcticGlobe._cells(raw, len(columns))
                 if cells is None:
                     continue
-                latitude = AntarcticGlobe._number(
-                    cells[indices["latitude"]]
-                )
-                longitude = AntarcticGlobe._number(
-                    cells[indices["longitude"]]
-                )
+                latitude = AntarcticGlobe._number(cells[indices["latitude"]])
+                longitude = AntarcticGlobe._number(cells[indices["longitude"]])
                 if (
                     latitude is None
                     or longitude is None
@@ -125,9 +124,7 @@ class SnapshotComparison(rx.State):
                     or not -180 <= longitude <= 180
                 ):
                     continue
-                value = AntarcticGlobe._number(
-                    cells[indices["measurement"]]
-                )
+                value = AntarcticGlobe._number(cells[indices["measurement"]])
                 if value is None or (
                     measurement_key == "sea_ice_concentration"
                     and not 0 <= value <= 100
@@ -137,9 +134,7 @@ class SnapshotComparison(rx.State):
                 latitude_bin = min(359, int((latitude + 90) / 0.5))
                 normalized_longitude = (longitude + 180) % 360
                 longitude_bin = min(359, int(normalized_longitude))
-                located_values.append(
-                    (latitude_bin, longitude_bin, value)
-                )
+                located_values.append((latitude_bin, longitude_bin, value))
             fraction = (
                 measurement_key == "sea_ice_concentration"
                 and bool(raw_values)
@@ -150,10 +145,7 @@ class SnapshotComparison(rx.State):
                 binned_values.setdefault(
                     (latitude_bin, longitude_bin), []
                 ).append(normalized_value)
-            if (
-                measurement_key == "sea_ice_concentration"
-                and fraction
-            ):
+            if measurement_key == "sea_ice_concentration" and fraction:
                 values.extend(value * 100 for value in raw_values)
             else:
                 values.extend(raw_values)
@@ -175,9 +167,7 @@ class SnapshotComparison(rx.State):
                     UploadedDataset.id.desc(),
                 )
             ).all()
-            catalog: list[
-                tuple[DatasetSummary, dict[str, str], list[str]]
-            ] = []
+            catalog: list[tuple[DatasetSummary, dict[str, str], list[str]]] = []
             for dataset in datasets:
                 summary = UploadedData._dataset_summary(dataset)
                 if not summary["map_ready"]:
@@ -202,14 +192,22 @@ class SnapshotComparison(rx.State):
             if "undated" in group_labels:
                 keys.append("undated")
             groups = [{"key": key, "label": group_labels[key]} for key in keys]
-            period_a = requested_a if requested_a in group_labels else (
-                keys[0] if keys else ""
+            period_a = (
+                requested_a
+                if requested_a in group_labels
+                else (keys[0] if keys else "")
             )
-            period_b = requested_b if requested_b in group_labels else (
-                keys[1] if len(keys) > 1 else ""
+            period_b = (
+                requested_b
+                if requested_b in group_labels
+                else (keys[1] if len(keys) > 1 else "")
             )
-            rows_a = [item for item in catalog if item[0]["group_key"] == period_a]
-            rows_b = [item for item in catalog if item[0]["group_key"] == period_b]
+            rows_a = [
+                item for item in catalog if item[0]["group_key"] == period_a
+            ]
+            rows_b = [
+                item for item in catalog if item[0]["group_key"] == period_b
+            ]
             available_a = {
                 key
                 for key, _, _ in MEASUREMENT_FIELDS
@@ -236,11 +234,7 @@ class SnapshotComparison(rx.State):
                 )
             )
             selected = next(
-                (
-                    item
-                    for item in measurements
-                    if item["key"] == selected_key
-                ),
+                (item for item in measurements if item["key"] == selected_key),
                 {"key": "", "label": "", "units": ""},
             )
             result: ComparisonResult = {
@@ -314,7 +308,9 @@ class SnapshotComparison(rx.State):
                     ]
                 )
             if comparison_points:
-                max_abs = max(abs(float(point[2])) for point in comparison_points)
+                max_abs = max(
+                    abs(float(point[2])) for point in comparison_points
+                )
                 filename = f"antarctic_comparison_{uuid4().hex}.json"
                 path: Path = rx.get_upload_dir() / filename
                 try:
@@ -475,6 +471,4 @@ class SnapshotComparison(rx.State):
                     self.globe_filename = ""
                     self.comparable_cells = 0
                     self.globe_max_abs = 0
-            await asyncio.to_thread(
-                SnapshotComparison._remove_file, previous
-            )
+            await asyncio.to_thread(SnapshotComparison._remove_file, previous)

@@ -6,7 +6,10 @@ from antarctic_sea_ice_dashboard.states.uploaded_data import (
     EditorField,
     MAX_ROWS,
 )
-from antarctic_sea_ice_dashboard.components.overview_source import active_source, source_configuration
+from antarctic_sea_ice_dashboard.components.overview_source import (
+    active_source,
+    source_configuration,
+)
 
 
 BUTTON = "inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-sky-800 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -33,10 +36,10 @@ def import_zone() -> rx.Component:
                     max=9999,
                     step=1,
                     required=True,
-                    value=D.upload_year,
                     on_change=D.set_upload_year,
                     disabled=D.importing,
                     class_name=INPUT,
+                    default_value=D.upload_year,
                 ),
                 class_name="grid gap-1 text-[11px] font-medium text-slate-600",
             ),
@@ -48,10 +51,10 @@ def import_zone() -> rx.Component:
                     max=12,
                     step=1,
                     required=True,
-                    value=D.upload_month,
                     on_change=D.set_upload_month,
                     disabled=D.importing,
                     class_name=INPUT,
+                    default_value=D.upload_month,
                 ),
                 class_name="grid gap-1 text-[11px] font-medium text-slate-600",
             ),
@@ -120,7 +123,7 @@ def import_zone() -> rx.Component:
             class_name="mt-3 flex flex-wrap gap-2",
         ),
         rx.el.p(
-            "Up to 120,000 rows and 10 columns per CSV; the 20 MB per-file limit still applies. Unique nonempty headers; equal field counts. Header-only CSVs are supported. Values remain strings, including dates, formulas and leading zeros.",
+            "Up to 400,000 rows and 10 columns per CSV; the 20 MB per-file limit still applies. Unique nonempty headers; equal field counts. Header-only CSVs are supported. Values remain strings, including dates, formulas and leading zeros.",
             class_name="mt-3 text-[10px] leading-relaxed text-slate-500",
         ),
         rx.el.p(
@@ -548,7 +551,7 @@ def dataset_editor() -> rx.Component:
                     rx.cond(
                         D.row_count >= MAX_ROWS,
                         rx.el.p(
-                            "120,000-row limit reached. Delete a row before adding another.",
+                            "400,000-row limit reached. Delete a row before adding another.",
                             class_name="mt-2 text-[11px] text-slate-500",
                         ),
                     ),

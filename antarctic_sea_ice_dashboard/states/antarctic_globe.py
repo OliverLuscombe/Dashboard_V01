@@ -11,9 +11,13 @@ from uuid import uuid4
 import reflex as rx
 from sqlalchemy import select
 
-from antarctic_sea_ice_dashboard.models import UploadedDataset, UploadedDatasetRow
+from antarctic_sea_ice_dashboard.models import (
+    UploadedDataset,
+    UploadedDatasetRow,
+)
 from antarctic_sea_ice_dashboard.states.uploaded_data import (
     DatasetSummary,
+    MAX_ROWS,
     UploadedData,
 )
 
@@ -27,7 +31,6 @@ MEASUREMENT_FIELDS = (
 MEASUREMENT_LABELS = {
     key: (label, units) for key, label, units in MEASUREMENT_FIELDS
 }
-MAX_ROWS = 120000
 
 
 class GlobeResult(TypedDict):
@@ -80,6 +83,7 @@ class AntarcticGlobe(rx.State):
         try:
             number = float(value.strip().replace(",", ""))
         except (AttributeError, ValueError):
+            logging.exception("Unexpected error")
             return None
         return number if math.isfinite(number) else None
 
@@ -88,6 +92,7 @@ class AntarcticGlobe(rx.State):
         try:
             cells = json.loads(raw)
         except (TypeError, json.JSONDecodeError):
+            logging.exception("Unexpected error")
             return None
         if (
             not isinstance(cells, list)
@@ -99,8 +104,9 @@ class AntarcticGlobe(rx.State):
 
     @staticmethod
     def _snapshot(mapping: dict[str, str]) -> tuple[str, str]:
-        year, month = mapping.get("fixed_year", ""), mapping.get(
-            "fixed_month", ""
+        year, month = (
+            mapping.get("fixed_year", ""),
+            mapping.get("fixed_month", ""),
         )
         if bool(year) != bool(month):
             raise ValueError("Both snapshot year and month are required.")
@@ -127,7 +133,9 @@ class AntarcticGlobe(rx.State):
                     UploadedDataset.id.desc(),
                 )
             ).all()
-            catalogue: list[tuple[DatasetSummary, dict[str, str], list[str]]] = []
+            catalogue: list[
+                tuple[DatasetSummary, dict[str, str], list[str]]
+            ] = []
             for dataset in datasets:
                 try:
                     summary = UploadedData._dataset_summary(dataset)
@@ -161,9 +169,7 @@ class AntarcticGlobe(rx.State):
                 else (groups[0]["key"] if groups else "")
             )
             selected_rows = [
-                item
-                for item in catalogue
-                if item[0]["group_key"] == selected
+                item for item in catalogue if item[0]["group_key"] == selected
             ]
             layers = [item[0] for item in selected_rows]
             measurements = [
@@ -187,7 +193,9 @@ class AntarcticGlobe(rx.State):
             )
 
             result: GlobeResult = {
-                "status": "demo" if not any(layer["active"] for layer in layers) else "empty",
+                "status": "demo"
+                if not any(layer["active"] for layer in layers)
+                else "empty",
                 "filename": "",
                 "groups": groups,
                 "selected_group": selected,
@@ -201,7 +209,9 @@ class AntarcticGlobe(rx.State):
                 "measurement_column": "",
                 "measurement_units": selected_measurement["units"],
                 "value_range": "",
-                "snapshot_label": group_entries.get(selected, "No dated CSV group"),
+                "snapshot_label": group_entries.get(
+                    selected, "No dated CSV group"
+                ),
                 "total": 0,
                 "valid": 0,
                 "invalid_coordinates": 0,
@@ -249,13 +259,15 @@ class AntarcticGlobe(rx.State):
                     layer_rows += 1
                     if layer_rows > MAX_ROWS:
                         raise ValueError(
-                            f"CSV layer {summary['name']} exceeds the supported 120,000-row limit."
+                            f"CSV layer {summary['name']} exceeds the supported {MAX_ROWS:,}-row limit."
                         )
                     cells = AntarcticGlobe._cells(raw, len(columns))
                     if cells is None:
                         result["invalid_coordinates"] += 1
                         continue
-                    latitude = AntarcticGlobe._number(cells[indices["latitude"]])
+                    latitude = AntarcticGlobe._number(
+                        cells[indices["latitude"]]
+                    )
                     longitude = AntarcticGlobe._number(
                         cells[indices["longitude"]]
                     )
@@ -343,8 +355,8 @@ class AntarcticGlobe(rx.State):
             raise
 
         result["filename"] = filename
-        result["status"] = "ready" if points else (
-            "empty" if active_layers else "demo"
+        result["status"] = (
+            "ready" if points else ("empty" if active_layers else "demo")
         )
         result["message"] = (
             f"{result['valid']:,} valid observations across "
