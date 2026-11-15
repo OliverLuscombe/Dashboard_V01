@@ -86,10 +86,13 @@ pixel inspection behavior are described in
 - Latitude/longitude columns are the map position source. A point's visual
   elevation and a comparison cell's bin size are display choices, not
   measurements of thickness, terrain, cell area, or scientific resolution.
-- Concentration normalization is applied only to per-file globe payloads under
-  the documented all-values-at-most-1 rule. The app does not infer a
-  concentration unit, validate sensor quality, interpolate observations, or
-  compute area-weighted extent.
+- Concentration normalization is applied per CSV under the documented
+  all-valid-values-at-most-1 rule. Map Explorer derives one observed
+  min/max range per selected measurement across all mapped CSVs, independent
+  of snapshot group and layer activation, so the globe colors and legend remain
+  comparable when switching dates. The app does not infer a concentration
+  unit, validate sensor quality, interpolate observations, or compute
+  area-weighted extent.
 - The browser requires external access to the basemap and JavaScript/font CDNs.
   Data loading and database failures are shown as errors rather than replaced
   with synthetic data. Unconnected demo pages remain clearly separate from the

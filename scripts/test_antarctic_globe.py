@@ -161,6 +161,7 @@ class AntarcticGlobeRenderTests(unittest.TestCase):
             result, point_file = render(
                 [other_month, second, first],
                 [
+                    [["-70", "20", "100"]],
                     [["-70", "20", "100"], ["-65", "30", "75"]],
                     [
                         ["-90", "0", "0"],
@@ -190,6 +191,53 @@ class AntarcticGlobeRenderTests(unittest.TestCase):
             ["Percent", "Fractional"],
         )
         self.assertNotIn("Other month", result["source_name"])
+
+    def test_concentration_colors_share_range_across_snapshot_groups(self):
+        columns = ["Latitude", "Longitude", "Concentration"]
+        later = dataset(
+            12,
+            "2016 observations",
+            1,
+            columns,
+            {
+                "latitude": "Latitude",
+                "longitude": "Longitude",
+                "sea_ice_concentration": "Concentration",
+                "fixed_year": "2016",
+                "fixed_month": "9",
+            },
+        )
+        earlier = dataset(
+            11,
+            "2006 observations",
+            1,
+            columns,
+            {
+                "latitude": "Latitude",
+                "longitude": "Longitude",
+                "sea_ice_concentration": "Concentration",
+                "fixed_year": "2006",
+                "fixed_month": "9",
+            },
+            active=False,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            result, point_file = render(
+                [later, earlier],
+                [
+                    [["-70", "20", "0.16"]],
+                    [["-70", "20", "0.22"]],
+                ],
+                directory,
+                "2016-09",
+            )
+            points = json.loads(point_file.read_text(encoding="utf-8"))["points"]
+
+        self.assertEqual(result["value_range"], "16–22 %")
+        self.assertEqual(result["scale_min"], "16 %")
+        self.assertEqual(result["scale_max"], "22 %")
+        self.assertEqual([point[2] for point in points], [0])
+        self.assertEqual([point[3] for point in points], [16])
 
     def test_inactive_csvs_are_grouped_without_rendering_observations(self):
         source = dataset(

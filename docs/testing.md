@@ -32,7 +32,7 @@ code or test assertions.
 | Test module | Cases covered |
 |---|---|
 | [`test_csv_validation.py`](../scripts/test_csv_validation.py) | UTF-8/BOM decoding, quoted values, string preservation, CSV size/row/column limits, malformed files, snapshot-date validation, geographic/measurement mapping suggestions and validation. |
-| [`test_antarctic_globe.py`](../scripts/test_antarctic_globe.py) | Geographic mapping requirements, legacy undated sources, snapshot grouping, active-layer batching, invalid observation handling, measurement scaling, and comparison summaries/difference cells. |
+| [`test_antarctic_globe.py`](../scripts/test_antarctic_globe.py) | Geographic mapping requirements, legacy undated sources, snapshot grouping, active-layer batching, invalid observation handling, cross-snapshot shared color ranges, measurement scaling, and comparison summaries/difference cells. |
 | [`test_overview_grid.py`](../scripts/test_overview_grid.py) | Grid coordinate bounds and corners, row-order mode, numeric and categorical raster behavior, duplicate ownership, transparent missing cells, saved-row lookup, bounded result metadata, database failure reporting, and generated-file cleanup. |
 | [`test_overview_periods.py`](../scripts/test_overview_periods.py) | Available year/month periods, undated and partially dated sources, invalid dates/readings, period-specific raster/card/monthly aggregation, manual dates, pixel inspection, stale request protection, and supported period controls. |
 
@@ -48,7 +48,7 @@ Validation run on 2026-11-15 with Python 3.13:
 
 | Run | Result |
 |---|---|
-| Full `unittest` discovery under Reflex test mode | **54 tests passed** in 5.457 seconds. |
+| Full `unittest` discovery under Reflex test mode | **55 tests passed** in 7.084 seconds. |
 | Python syntax parsing | **35 Python source files parsed successfully** with Python 3.13. |
 
 No latency or throughput benchmark is included. The test timings above are

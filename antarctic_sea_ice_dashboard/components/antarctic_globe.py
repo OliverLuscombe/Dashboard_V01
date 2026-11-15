@@ -205,23 +205,11 @@ def globe_map() -> rx.Component:
             ),
             rx.el.div(
                 rx.el.div(
-                    rx.el.span(
-                        rx.cond(
-                            Globe.measurement_key == "sea_ice_concentration",
-                            "0%",
-                            "Low",
-                        )
-                    ),
+                    rx.el.span(Globe.scale_min),
                     rx.el.div(
                         class_name="h-3 flex-1 rounded-full bg-[linear-gradient(90deg,#17324d_0%,#2878a5_30%,#66b8a5_58%,#f2df77_78%,#d94b37_100%)]",
                     ),
-                    rx.el.span(
-                        rx.cond(
-                            Globe.measurement_key == "sea_ice_concentration",
-                            "100%",
-                            "High",
-                        )
-                    ),
+                    rx.el.span(Globe.scale_max),
                     class_name="flex min-w-[240px] flex-1 items-center gap-3 text-[10px] font-medium text-slate-600",
                 ),
                 rx.el.span(

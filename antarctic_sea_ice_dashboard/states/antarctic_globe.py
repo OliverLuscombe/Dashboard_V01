@@ -45,6 +45,8 @@ class GlobeResult(TypedDict):
     measurement_column: str
     measurement_units: str
     value_range: str
+    scale_min: str
+    scale_max: str
     snapshot_label: str
     total: int
     valid: int
@@ -69,6 +71,8 @@ class AntarcticGlobe(rx.State):
     measurement_column: str = ""
     measurement_units: str = ""
     value_range: str = ""
+    scale_min: str = "Low"
+    scale_max: str = "High"
     snapshot_label: str = ""
     total: int = 0
     valid: int = 0
@@ -205,6 +209,8 @@ class AntarcticGlobe(rx.State):
                 "measurement_column": "",
                 "measurement_units": selected_measurement["units"],
                 "value_range": "",
+                "scale_min": "Low",
+                "scale_max": "High",
                 "snapshot_label": group_entries.get(selected, "No dated CSV group"),
                 "total": 0,
                 "valid": 0,
@@ -223,18 +229,24 @@ class AntarcticGlobe(rx.State):
             points: list[list[str | float]] = []
             all_values: list[float] = []
             mapped_columns: list[str] = []
+            scale_min: float | None = None
+            scale_max: float | None = None
             active_layers = [
                 item for item in selected_rows if item[0]["active"]
             ]
-            for summary, mapping, columns in active_layers:
+            for summary, mapping, columns in catalogue:
                 measurement_column = mapping.get(measurement_key, "")
                 if not measurement_column:
                     continue
+                is_visible_layer = (
+                    summary["group_key"] == selected and summary["active"]
+                )
                 indices = {
                     field: columns.index(mapping[field])
                     for field in ("latitude", "longitude", measurement_key)
                 }
-                mapped_columns.append(measurement_column)
+                if is_visible_layer:
+                    mapped_columns.append(measurement_column)
                 values_for_layer: list[float] = []
                 raw_points: list[tuple[float, float, float]] = []
                 rows = session.execute(
@@ -249,15 +261,17 @@ class AntarcticGlobe(rx.State):
                 )
                 layer_rows = 0
                 for (raw,) in rows:
-                    result["total"] += 1
                     layer_rows += 1
                     if layer_rows > MAX_ROWS:
                         raise ValueError(
                             f"CSV layer {summary['name']} exceeds the supported 120,000-row limit."
                         )
+                    if is_visible_layer:
+                        result["total"] += 1
                     cells = AntarcticGlobe._cells(raw, len(columns))
                     if cells is None:
-                        result["invalid_coordinates"] += 1
+                        if is_visible_layer:
+                            result["invalid_coordinates"] += 1
                         continue
                     latitude = AntarcticGlobe._number(cells[indices["latitude"]])
                     longitude = AntarcticGlobe._number(
@@ -269,7 +283,8 @@ class AntarcticGlobe(rx.State):
                         or not -90 <= latitude <= 90
                         or not -180 <= longitude <= 180
                     ):
-                        result["invalid_coordinates"] += 1
+                        if is_visible_layer:
+                            result["invalid_coordinates"] += 1
                         continue
                     value = AntarcticGlobe._number(
                         cells[indices[measurement_key]]
@@ -278,7 +293,8 @@ class AntarcticGlobe(rx.State):
                         measurement_key == "sea_ice_concentration"
                         and not 0 <= value <= 100
                     ):
-                        result["invalid_readings"] += 1
+                        if is_visible_layer:
+                            result["invalid_readings"] += 1
                         continue
                     raw_points.append((longitude, latitude, value))
                     values_for_layer.append(value)
@@ -287,8 +303,28 @@ class AntarcticGlobe(rx.State):
                     and bool(values_for_layer)
                     and max(values_for_layer) <= 1
                 )
-                for longitude, latitude, raw_value in raw_points:
-                    value = raw_value * 100 if fractional else raw_value
+                converted_values = [
+                    raw_value * 100 if fractional else raw_value
+                    for _, _, raw_value in raw_points
+                ]
+                if converted_values:
+                    layer_min = min(converted_values)
+                    layer_max = max(converted_values)
+                    scale_min = (
+                        layer_min
+                        if scale_min is None
+                        else min(scale_min, layer_min)
+                    )
+                    scale_max = (
+                        layer_max
+                        if scale_max is None
+                        else max(scale_max, layer_max)
+                    )
+                if not is_visible_layer:
+                    continue
+                for (longitude, latitude, _), value in zip(
+                    raw_points, converted_values, strict=True
+                ):
                     points.append(
                         [
                             longitude,
@@ -302,20 +338,24 @@ class AntarcticGlobe(rx.State):
                     )
                     all_values.append(value)
 
-            if measurement_key != "sea_ice_concentration" and all_values:
-                minimum, maximum = min(all_values), max(all_values)
-                span = maximum - minimum
+            if scale_min is not None and scale_max is not None:
+                span = scale_max - scale_min
                 for point in points:
                     point[2] = (
                         50
                         if span == 0
-                        else (float(point[3]) - minimum) / span * 100
+                        else (float(point[3]) - scale_min) / span * 100
                     )
                 result["value_range"] = (
-                    f"{minimum:.3g}–{maximum:.3g} {selected_measurement['units']}"
+                    f"{scale_min:.3g}–{scale_max:.3g} "
+                    f"{selected_measurement['units']}"
                 )
-            elif measurement_key == "sea_ice_concentration":
-                result["value_range"] = "0–100%"
+                result["scale_min"] = (
+                    f"{scale_min:.3g} {selected_measurement['units']}"
+                )
+                result["scale_max"] = (
+                    f"{scale_max:.3g} {selected_measurement['units']}"
+                )
             else:
                 result["value_range"] = (
                     f"No valid {selected_measurement['units']} values"
@@ -460,6 +500,8 @@ class AntarcticGlobe(rx.State):
                     self.measurement_column = result["measurement_column"]
                     self.measurement_units = result["measurement_units"]
                     self.value_range = result["value_range"]
+                    self.scale_min = result["scale_min"]
+                    self.scale_max = result["scale_max"]
                     self.snapshot_label = result["snapshot_label"]
                     self.total = result["total"]
                     self.valid = result["valid"]
