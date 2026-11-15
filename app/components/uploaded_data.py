@@ -1,3 +1,5 @@
+"""Render the legacy upload, dataset catalogue, preview, and edit interface."""
+
 import reflex as rx
 from app.states.uploaded_data import (
     UploadedData as D,
@@ -16,6 +18,7 @@ INPUT = "w-full min-h-9 rounded-md border border-slate-200 bg-white px-3 py-2 te
 
 
 def import_zone() -> rx.Component:
+    """Render the legacy single-file CSV import control and guidance."""
     return rx.el.section(
         rx.el.h2(
             "Import CSV", class_name="text-sm font-semibold text-[#172e40]"
@@ -567,6 +570,7 @@ def dataset_editor() -> rx.Component:
 
 
 def uploaded_workspace() -> rx.Component:
+    """Compose the legacy CSV catalogue, preview, and edit workspace."""
     return rx.el.div(
         rx.el.div(
             rx.icon("users", class_name="h-5 w-5 shrink-0 text-[#36758b]"),

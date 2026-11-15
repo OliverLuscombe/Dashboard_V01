@@ -1,3 +1,5 @@
+"""Load and summarize uploaded geographic observations for Map Explorer."""
+
 import asyncio
 import json
 import logging
@@ -53,6 +55,8 @@ class GlobeResult(TypedDict):
 
 
 class AntarcticGlobe(rx.State):
+    """Manage date-grouped globe layers and serialize selected observations."""
+
     status: str = "loading"
     filename: str = ""
     groups: list[dict[str, str]] = []
@@ -363,6 +367,7 @@ class AntarcticGlobe(rx.State):
 
     @rx.event
     def refresh(self):
+        """Reload available layers and render the currently selected group."""
         self.request_id += 1
         self.status = "loading"
         self.message = "Loading geographic observations…"
@@ -433,6 +438,7 @@ class AntarcticGlobe(rx.State):
     async def render(
         self, request_id: int, selected_group: str, measurement_key: str
     ):
+        """Build a bounded point payload off the event loop and publish its status."""
         previous = ""
         try:
             result = await asyncio.to_thread(

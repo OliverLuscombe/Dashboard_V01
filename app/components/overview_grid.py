@@ -1,3 +1,5 @@
+"""Build the legacy uploaded-data grid, legends, timeline, and summary cards."""
+
 import reflex as rx
 import reflex_xy as xy
 from app.states.overview_grid import (
@@ -79,6 +81,7 @@ def uploaded_period_controls() -> rx.Component:
 
 
 def uploaded_timeline() -> rx.Component:
+    """Render available period controls and playback for the selected grid."""
     return rx.el.div(
         rx.el.div(
             rx.icon("calendar-days", class_name="h-4 w-4 text-[#286180]"),
@@ -320,6 +323,7 @@ def grid_legend() -> rx.Component:
 
 
 def grid_map() -> rx.Component:
+    """Display the selected raster layer, legend, and observation diagnostics."""
     return rx.el.section(
         rx.el.div(
             rx.el.div(
@@ -541,6 +545,7 @@ def grid_inspector() -> rx.Component:
 
 
 def uploaded_overview() -> rx.Component:
+    """Compose the legacy data-backed Overview cards, chart, map, and inspector."""
     return rx.el.div(
         rx.el.div(
             rx.icon("info", class_name="h-4 w-4 shrink-0 text-[#286180]"),

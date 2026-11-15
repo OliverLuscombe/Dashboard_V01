@@ -1,3 +1,5 @@
+"""Aggregate two saved geographic snapshots and prepare a spatial difference."""
+
 import asyncio
 import json
 import logging
@@ -42,6 +44,8 @@ class ComparisonResult(TypedDict):
 
 
 class SnapshotComparison(rx.State):
+    """Track selected periods, shared measurements, summaries, and map output."""
+
     groups: list[dict[str, str]] = []
     period_a: str = ""
     period_b: str = ""
@@ -364,6 +368,7 @@ class SnapshotComparison(rx.State):
 
     @rx.event
     def refresh(self):
+        """Refresh eligible snapshot groups while preserving valid selections."""
         return self._start_comparison()
 
     @staticmethod
@@ -416,6 +421,7 @@ class SnapshotComparison(rx.State):
         period_b: str,
         measurement_key: str,
     ):
+        """Compute comparable summaries and matched-cell differences in a worker."""
         try:
             result = await asyncio.to_thread(
                 SnapshotComparison._compare,

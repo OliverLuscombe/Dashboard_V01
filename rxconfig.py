@@ -1,3 +1,5 @@
+"""Configure the Reflex application, database URL, and UI plugins."""
+
 import os
 from pathlib import Path
 

@@ -1,3 +1,5 @@
+"""Assemble the navigation shell and the dashboard's workspace panels."""
+
 import reflex as rx
 import reflex_xy as xy
 from antarctic_sea_ice_dashboard.states.explorer import Explorer as S
@@ -1272,6 +1274,7 @@ def display_options() -> rx.Component:
 
 
 def workspace() -> rx.Component:
+    """Compose the responsive navigation shell and selected workspace page."""
     return rx.el.div(
         sidebar(),
         rx.el.div(

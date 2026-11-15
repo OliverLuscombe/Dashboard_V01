@@ -1,3 +1,5 @@
+"""Manage CSV persistence and saved-data editing for the legacy workspace."""
+
 import reflex as rx
 import asyncio
 import csv
@@ -63,6 +65,8 @@ class EditorField(TypedDict):
 
 
 class UploadedData(rx.State):
+    """Coordinate legacy CSV imports, data previews, edits, and source mappings."""
+
     catalogue: list[DatasetSummary] = []
     selected_id: int = 0
     selected_name: str = ""
@@ -251,6 +255,7 @@ class UploadedData(rx.State):
     def _parse_csv(
         filename: str, data: bytes
     ) -> tuple[list[str], list[list[str]]]:
+        """Decode and validate uploaded text rows before database persistence."""
         if PurePath(filename).suffix.lower() != ".csv":
             raise ValueError("Choose a file with a .csv extension.")
         if len(data) > MAX_BYTES:
@@ -456,6 +461,7 @@ class UploadedData(rx.State):
 
     @rx.event
     async def import_csv(self, files: list[rx.UploadFile]):
+        """Stage a single uploaded file and queue its validated import."""
         self.error = ""
         self.success = ""
         if len(files) != 1:
@@ -546,6 +552,7 @@ class UploadedData(rx.State):
 
     @rx.event(background=True)
     async def process_csv(self, temporary_name: str, filename: str):
+        """Persist the staged CSV atomically and refresh the dataset catalogue."""
         try:
             new_id, count = await asyncio.to_thread(
                 UploadedData._persist_csv, temporary_name, filename

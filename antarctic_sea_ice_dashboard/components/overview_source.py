@@ -1,3 +1,5 @@
+"""Build the UI for choosing, mapping, and applying saved data sources."""
+
 import reflex as rx
 from antarctic_sea_ice_dashboard.states.uploaded_data import (
     UploadedData as D,
@@ -146,6 +148,7 @@ def active_source() -> rx.Component:
 
 
 def source_configuration() -> rx.Component:
+    """Render the selected dataset's mapping form and apply/remove actions."""
     return rx.el.section(
         rx.el.div(
             rx.el.h3(

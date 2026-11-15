@@ -1,3 +1,5 @@
+"""Assemble the retained legacy workspace navigation and content panels."""
+
 import reflex as rx
 import reflex_xy as xy
 from app.states.explorer import Explorer as S
@@ -1301,6 +1303,7 @@ def display_options() -> rx.Component:
 
 
 def workspace() -> rx.Component:
+    """Compose the legacy responsive shell and selected page content."""
     return rx.el.div(
         sidebar(),
         rx.el.div(

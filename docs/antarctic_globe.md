@@ -1,5 +1,9 @@
 # Antarctic CSV globe
 
+See the project [design document](./design.md) for architecture, assumptions,
+and third-party attribution, and the [test report](./testing.md) for regression
+coverage and results.
+
 Map Explorer uses uploaded CSV observations on a south-polar globe with a coastline basemap. Overview and the old pixel-grid renderer are no longer part of the application. The globe places observations using the mapped Latitude and Longitude columns and sends all selected CSV observations to one batched Deck.gl WebGL layer.
 
 ## Importing and grouping snapshots

@@ -1,3 +1,5 @@
+"""Build the interactive Antarctic globe, layer controls, and status cards."""
+
 import reflex as rx
 
 from antarctic_sea_ice_dashboard.states.antarctic_globe import (
@@ -10,6 +12,7 @@ BUTTON = "inline-flex min-h-9 items-center justify-center gap-2 rounded-md borde
 
 
 def globe_layer(layer: DatasetSummary) -> rx.Component:
+    """Render one mapped CSV layer's activation control and snapshot details."""
     return rx.el.label(
         rx.el.input(
             type="checkbox",
@@ -42,6 +45,7 @@ def globe_layer(layer: DatasetSummary) -> rx.Component:
 
 
 def stat_card(label: str, value: rx.Var | str, detail: str) -> rx.Component:
+    """Show one observation summary alongside its context or sample count."""
     return rx.el.div(
         rx.el.p(label, class_name="text-[10px] font-medium text-slate-500"),
         rx.el.p(
@@ -54,6 +58,7 @@ def stat_card(label: str, value: rx.Var | str, detail: str) -> rx.Component:
 
 
 def globe_map() -> rx.Component:
+    """Render the browser-mounted polar globe and its current status overlay."""
     return rx.el.section(
         rx.el.div(
             rx.el.div(

@@ -1,3 +1,5 @@
+"""Configure and register the Reflex page and its workspace state handlers."""
+
 import reflex as rx
 import antarctic_sea_ice_dashboard.models  # Register the schema without executing database operations.
 from antarctic_sea_ice_dashboard.components.workspace import workspace
@@ -7,6 +9,7 @@ from antarctic_sea_ice_dashboard.states.explorer import Explorer
 
 
 def index() -> rx.Component:
+    """Return the single-page research workspace."""
     return workspace()
 
 

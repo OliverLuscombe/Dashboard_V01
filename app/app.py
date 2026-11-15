@@ -1,3 +1,5 @@
+"""Legacy Reflex entry point for the retained pixel-grid Overview interface."""
+
 import reflex as rx
 import app.models  # Register the schema without executing database operations.
 from app.components.workspace import workspace
@@ -6,6 +8,7 @@ from app.states.overview_grid import OverviewGrid
 
 
 def index() -> rx.Component:
+    """Return the legacy workspace component tree."""
     return workspace()
 
 

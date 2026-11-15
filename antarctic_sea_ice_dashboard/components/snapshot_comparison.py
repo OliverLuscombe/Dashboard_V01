@@ -1,3 +1,5 @@
+"""Compose snapshot selectors, comparison summaries, and the difference globe."""
+
 import reflex as rx
 
 from antarctic_sea_ice_dashboard.states.snapshot_comparison import (
@@ -139,6 +141,7 @@ def difference_globe() -> rx.Component:
 
 
 def snapshot_comparison() -> rx.Component:
+    """Compose the comparison controls, summaries, and spatial-difference view."""
     return rx.el.div(
         rx.el.section(
             rx.el.div(

@@ -1,3 +1,5 @@
+"""Validate, persist, configure, and edit datasets uploaded to the workspace."""
+
 import reflex as rx
 import asyncio
 import csv
@@ -61,6 +63,8 @@ class EditorField(TypedDict):
 
 
 class UploadedData(rx.State):
+    """Coordinate CSV uploads, bounded previews, row edits, and source mappings."""
+
     catalogue: list[DatasetSummary] = []
     selected_id: int = 0
     selected_name: str = ""
@@ -223,6 +227,7 @@ class UploadedData(rx.State):
     def _parse_csv(
         filename: str, data: bytes
     ) -> tuple[list[str], list[list[str]]]:
+        """Decode and validate a CSV against the workspace's import limits."""
         if PurePath(filename).suffix.lower() != ".csv":
             raise ValueError("Choose a file with a .csv extension.")
         if len(data) > MAX_BYTES:
@@ -456,6 +461,7 @@ class UploadedData(rx.State):
 
     @rx.event
     async def import_csv(self, files: list[rx.UploadFile]):
+        """Receive one upload, validate its snapshot date, and queue its import."""
         self.error = ""
         self.success = ""
         try:
@@ -567,6 +573,7 @@ class UploadedData(rx.State):
     async def process_csv(
         self, temporary_name: str, filename: str, year: str, month: str
     ):
+        """Persist validated CSV rows and metadata as one database operation."""
         try:
             new_id, count = await asyncio.to_thread(
                 UploadedData._persist_csv,
@@ -648,6 +655,7 @@ class UploadedData(rx.State):
 
     @rx.event
     def apply_source(self, form_data: dict[str, Any]):
+        """Validate and save the selected dataset's geographic measurement mapping."""
         if self.source_saving or self.importing or self.loading:
             return
         mapping = {key: str(form_data.get(key, "")) for key in MAPPING_LABELS}

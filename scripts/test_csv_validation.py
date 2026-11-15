@@ -1,3 +1,5 @@
+"""Regression tests for CSV parsing limits, date metadata, and field mappings."""
+
 import unittest
 
 from antarctic_sea_ice_dashboard.states.uploaded_data import (

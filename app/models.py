@@ -1,3 +1,5 @@
+"""Database models retained for the legacy pixel-grid Overview implementation."""
+
 import reflex as rx
 from datetime import UTC, datetime
 
@@ -16,6 +18,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
+    """Common SQLAlchemy metadata base for legacy tables."""
+
     pass
 
 

@@ -1,7 +1,10 @@
 (() => {
+  // Keep the map colors and overlays local to this runtime so multiple map
+  // elements can be mounted and disposed independently.
   const activeMaps = new Map();
   const observationAltitudeMeters = 18000;
 
+  // Map measurement and signed-difference values to the two legend scales.
   const colorAt = (value) => {
     const stops = [
       [0, [23, 50, 77]],
@@ -215,6 +218,8 @@
   };
 
   const sync = () => {
+    // Reflex replaces component DOM during navigation; dispose removed maps
+    // before mounting any newly rendered globe elements.
     for (const [element, entry] of activeMaps) {
       if (!element.isConnected) {
         entry.overlay.finalize();

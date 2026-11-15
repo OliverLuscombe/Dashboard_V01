@@ -1,3 +1,5 @@
+"""Manage the clearly separate demonstration controls in the workspace."""
+
 import reflex as rx
 import reflex_xy as xy
 import asyncio
@@ -6,6 +8,8 @@ from faker import Faker
 
 
 class Explorer(rx.State):
+    """Hold demo-only navigation, playback, filtering, and model-insight state."""
+
     page: str = "Map Explorer"
     month: int = 9
     year: str = "2023"
@@ -63,6 +67,7 @@ class Explorer(rx.State):
 
     @rx.event
     def initialize(self):
+        """Restore the initial workspace to a supported section."""
         if self.page not in (
             "Map Explorer",
             "Compare",
@@ -133,6 +138,7 @@ class Explorer(rx.State):
 
     @rx.event
     def navigate(self, page: str):
+        """Switch workspace sections and refresh database-backed views as needed."""
         if page not in (
             "Map Explorer",
             "Compare",

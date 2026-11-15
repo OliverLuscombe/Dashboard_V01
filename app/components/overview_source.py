@@ -1,3 +1,5 @@
+"""Render source-selection and field-mapping controls for the legacy Overview."""
+
 import reflex as rx
 from app.states.uploaded_data import UploadedData as D, MappingField, GRID_ROWS
 
@@ -153,6 +155,7 @@ def active_source() -> rx.Component:
 
 
 def source_configuration() -> rx.Component:
+    """Render field mapping and activation controls for the legacy grid source."""
     return rx.el.section(
         rx.el.div(
             rx.el.h3(

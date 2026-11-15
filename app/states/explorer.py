@@ -1,3 +1,5 @@
+"""Provide demo-state controls for the retained legacy workspace."""
+
 import reflex as rx
 import reflex_xy as xy
 import asyncio
@@ -6,6 +8,8 @@ from faker import Faker
 
 
 class Explorer(rx.State):
+    """Hold synthetic navigation, filters, and visualization demo state."""
+
     page: str = "Overview"
     month: int = 9
     year: str = "2023"

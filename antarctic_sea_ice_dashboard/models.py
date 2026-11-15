@@ -1,3 +1,5 @@
+"""Relational models for shared uploaded CSV metadata and row storage."""
+
 import reflex as rx
 from datetime import UTC, datetime
 
@@ -16,6 +18,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
+    """Common SQLAlchemy metadata base for the dashboard's database tables."""
+
     pass
 
 

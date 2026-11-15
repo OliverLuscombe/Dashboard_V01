@@ -1,3 +1,5 @@
+"""Regression tests for geographic mappings, globe layers, and comparisons."""
+
 import json
 import tempfile
 import unittest
