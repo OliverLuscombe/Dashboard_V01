@@ -12,11 +12,14 @@ from pathlib import PurePath
 from typing import Any, TypedDict
 
 from sqlalchemy import delete, func, insert, select, text
-from antarctic_sea_ice_dashboard.models import UploadedDataset, UploadedDatasetRow
+from antarctic_sea_ice_dashboard.models import (
+    UploadedDataset,
+    UploadedDatasetRow,
+)
 
 
 MAX_BYTES = 20 * 1024 * 1024
-MAX_ROWS = 120000
+MAX_ROWS = 400000
 MAX_COLUMNS = 10
 MAX_CELL = 32768
 PAGE_SIZE = 25
@@ -261,7 +264,7 @@ class UploadedData(rx.State):
             records: list[list[str]] = []
             for index, cells in enumerate(reader, start=1):
                 if index > MAX_ROWS:
-                    raise ValueError("Use at most 120,000 data rows per CSV.")
+                    raise ValueError("Use at most 400,000 data rows per CSV.")
                 if len(cells) != len(headers):
                     raise ValueError(
                         f"Data row {index} has {len(cells)} fields; expected {len(headers)}. Check blank lines, commas and quoting."
@@ -286,7 +289,9 @@ class UploadedData(rx.State):
             not isinstance(columns, list)
             or not all(isinstance(column, str) for column in columns)
             or not isinstance(saved_mapping, dict)
-            or not all(isinstance(value, str) for value in saved_mapping.values())
+            or not all(
+                isinstance(value, str) for value in saved_mapping.values()
+            )
         ):
             raise ValueError(
                 f"Saved mapping for {dataset.name} is invalid. Review it in Data."
@@ -294,7 +299,9 @@ class UploadedData(rx.State):
         snapshot = "Undated"
         group_key = "undated"
         map_ready = False
-        map_message = "Map Latitude, Longitude, and a supported measurement in Data."
+        map_message = (
+            "Map Latitude, Longitude, and a supported measurement in Data."
+        )
         try:
             UploadedData._validate_mapping(
                 columns, dataset.row_count, saved_mapping
@@ -359,8 +366,7 @@ class UploadedData(rx.State):
                 )
             ).all()
             catalogue = [
-                UploadedData._dataset_summary(dataset)
-                for dataset in datasets
+                UploadedData._dataset_summary(dataset) for dataset in datasets
             ]
             self.active_sources = [
                 dataset for dataset in catalogue if dataset["active"]
@@ -448,9 +454,7 @@ class UploadedData(rx.State):
     @rx.event
     def set_upload_year(self, value: float):
         value = float(value)
-        self.upload_year = (
-            str(int(value)) if value.is_integer() else str(value)
-        )
+        self.upload_year = str(int(value)) if value.is_integer() else str(value)
 
     @rx.event
     def set_upload_month(self, value: float):
@@ -723,7 +727,9 @@ class UploadedData(rx.State):
         ]
         self.mapping_revision += 1
         self.source_error = ""
-        self.source_success = "Header suggestions restored. Review the mapping and apply to save."
+        self.source_success = (
+            "Header suggestions restored. Review the mapping and apply to save."
+        )
 
     @rx.event
     def select_dataset(self, dataset_id: int):
@@ -786,7 +792,7 @@ class UploadedData(rx.State):
         self.success = ""
         if self.row_count >= MAX_ROWS:
             self._clear_editor()
-            self.error = "This dataset has reached the 120,000-row limit. Delete a row before adding another."
+            self.error = "This dataset has reached the 400,000-row limit. Delete a row before adding another."
             return
         self._clear_editor()
         self.editor_mode = "add"
@@ -848,7 +854,7 @@ class UploadedData(rx.State):
                     if self.editor_mode == "add":
                         if dataset.row_count >= MAX_ROWS:
                             raise ValueError(
-                                "This dataset has reached the 120,000-row limit."
+                                "This dataset has reached the 400,000-row limit."
                             )
                         last_position = session.scalar(
                             select(
