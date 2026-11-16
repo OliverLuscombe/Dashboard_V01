@@ -9,6 +9,10 @@ from app.components.overview_grid import (
     uploaded_period_controls,
 )
 from app.states.overview_grid import OverviewGrid as G
+from app.states.uploaded_data import (
+    PredictionComparisonRow,
+    UploadedData as D,
+)
 
 
 BUTTON = "inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-sky-800 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
@@ -214,11 +218,11 @@ def title() -> rx.Component:
                     ),
                     (
                         "Model Insights",
-                        "Explore illustrative K-Means groupings — not trained model results.",
+                        "Compare saved sea-ice concentration predictions with recorded monthly observations.",
                     ),
                     (
                         "Data",
-                        "Import, preview and edit shared CSVs, then explicitly configure an Overview source; other demo pages remain synthetic.",
+                        "Import and edit CSVs, configure an Overview source, or designate prediction data for Model Insights.",
                     ),
                     "Modelling Antarctic Sea Ice with Supervised Machine Learning and Satellite Data",
                 ),
@@ -1022,100 +1026,226 @@ def cluster_card(
     )
 
 
-def model() -> rx.Component:
-    return rx.el.div(
+def prediction_comparison_row(row: PredictionComparisonRow) -> rx.Component:
+    """Render one monthly prediction, observation, and score row."""
+    return rx.el.tr(
+        rx.el.td(row["period"], class_name="px-3 py-2 text-left"),
+        rx.el.td(f'{row["prediction"]:.2f}%', class_name="px-3 py-2 text-right"),
+        rx.el.td(f'{row["observed"]:.2f}%', class_name="px-3 py-2 text-right"),
+        rx.el.td(f'{row["accuracy"]:.1f}%', class_name="px-3 py-2 text-right"),
+        class_name="border-t border-slate-100 text-xs text-slate-700",
+    )
+
+
+def prediction_comparison_panel() -> rx.Component:
+    """Show the selected prediction source and its matched-month accuracy."""
+    return rx.el.section(
         rx.el.div(
             rx.el.div(
-                rx.el.span(
-                    "MODEL",
-                    class_name="text-[9px] tracking-wider text-slate-500",
-                ),
-                rx.el.p(
-                    "K-Means clustering",
-                    class_name="mt-1 text-sm font-semibold text-slate-800",
-                ),
-            ),
-            rx.el.div(
-                rx.el.span(
-                    "INPUTS",
-                    class_name="text-[9px] tracking-wider text-slate-500",
-                ),
-                rx.el.p(
-                    "Sea ice · SST · Wind",
-                    class_name="mt-1 text-sm text-slate-700",
-                ),
-            ),
-            rx.el.div(
-                rx.el.span(
-                    "SILHOUETTE · DEMO",
-                    class_name="text-[9px] tracking-wider text-slate-500",
-                ),
-                rx.el.p("0.61", class_name="mt-1 text-sm text-slate-700"),
-            ),
-            rx.el.span(
-                rx.icon("circle-check", class_name="h-4 w-4"),
-                "Synthetic results loaded",
-                class_name="flex gap-2 items-center text-xs text-teal-700 ml-auto",
-            ),
-            class_name="flex flex-wrap gap-8 border border-slate-200 bg-white p-4 rounded-lg mb-4",
-        ),
-        rx.el.div(
-            map_panel(),
-            rx.el.div(
-                rx.el.h3(
-                    "Cluster summary",
+                rx.el.h2(
+                    "Sea-ice concentration prediction accuracy",
                     class_name="text-base font-semibold text-slate-800",
                 ),
                 rx.el.p(
-                    "Select a pattern to highlight its map sector.",
-                    class_name="text-xs text-slate-500",
+                    "Compare predicted and recorded monthly concentration for matching year/month pairs.",
+                    class_name="mt-1 text-xs text-slate-500",
                 ),
-                cluster_card(
-                    1, "━ Solid", "High concentration · colder surface", "34%"
-                ),
-                cluster_card(
-                    2,
-                    "▨ Diagonal",
-                    "Lower concentration · stronger winds",
-                    "26%",
-                ),
-                cluster_card(
-                    3,
-                    "┈ Dotted",
-                    "Intermediate concentration · mixed conditions",
-                    "22%",
-                ),
-                cluster_card(
-                    4, "╌ Alternating", "Sparse ice · warmer ocean", "18%"
-                ),
-                class_name="flex flex-col gap-3",
             ),
-            class_name="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px] gap-4",
+            rx.el.label(
+                "Prediction dataset",
+                rx.el.select(
+                    rx.foreach(
+                        D.model_predictions,
+                        lambda dataset: rx.el.option(
+                            dataset["name"], value=dataset["id"]
+                        ),
+                    ),
+                    value=D.model_prediction_id,
+                    on_change=D.select_model_prediction,
+                    disabled=D.model_predictions.length() == 0,
+                    class_name="min-h-9 min-w-48 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 focus-visible:outline-2 focus-visible:outline-sky-700",
+                ),
+                class_name="flex flex-col gap-1 text-[10px] font-medium text-slate-600",
+            ),
+            class_name="flex flex-wrap items-end justify-between gap-4",
         ),
         rx.el.div(
-            rx.el.h3(
-                f"Cluster {S.cluster} · variable profile",
-                class_name="text-base font-medium text-slate-800",
-            ),
-            rx.el.p(
-                rx.match(
-                    S.cluster,
-                    (1, "Concentration 86% · SST −1.8 °C · wind 8.2 m/s"),
-                    (2, "Concentration 52% · SST −0.7 °C · wind 16.1 m/s"),
-                    (3, "Concentration 64% · SST −1.1 °C · wind 11.4 m/s"),
-                    "Concentration 28% · SST 1.2 °C · wind 9.6 m/s",
+            rx.el.div(
+                rx.el.p(
+                    "MODEL ACCURACY",
+                    class_name="text-[9px] tracking-wider text-slate-500",
                 ),
-                class_name="text-sm text-[#2f718b] mt-3",
+                rx.el.p(
+                    rx.cond(
+                        D.model_accuracy >= 0,
+                        f"{D.model_accuracy:.1f}%",
+                        "Not available",
+                    ),
+                    class_name="mt-1 text-2xl font-semibold text-[#245f7e]",
+                ),
             ),
-            rx.el.p(
-                "Illustrative cluster means, not feature importance. K-Means is an unsupervised method that groups similar inputs; no model was trained here.",
-                class_name="text-xs text-slate-500 mt-3",
+            rx.el.div(
+                rx.el.p(
+                    "RECORDED DATASET",
+                    class_name="text-[9px] tracking-wider text-slate-500",
+                ),
+                rx.el.p(
+                    rx.cond(D.model_actual_name != "", D.model_actual_name, "Not selected"),
+                    class_name="mt-1 text-sm font-medium text-slate-700",
+                ),
             ),
-            rx.el.p(
-                "Future research methods: Random Forest and Support Vector Machine — not available in this prototype.",
-                class_name="text-xs text-slate-500 mt-3",
+            class_name="mt-4 flex flex-wrap gap-8 rounded-md bg-[#f4f8fa] p-3",
+        ),
+        rx.cond(
+            D.model_comparison.length() > 0,
+            rx.el.div(
+                rx.el.table(
+                    rx.el.thead(
+                        rx.el.tr(
+                            rx.el.th("Year-month", class_name="px-3 py-2 text-left"),
+                            rx.el.th("Prediction", class_name="px-3 py-2 text-right"),
+                            rx.el.th("Recorded", class_name="px-3 py-2 text-right"),
+                            rx.el.th("Accuracy", class_name="px-3 py-2 text-right"),
+                            class_name="bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500",
+                        )
+                    ),
+                    rx.el.tbody(
+                        rx.foreach(
+                            D.model_comparison,
+                            prediction_comparison_row,
+                        )
+                    ),
+                    class_name="w-full border-collapse",
+                ),
+                class_name="mt-4 overflow-x-auto rounded-md border border-slate-200",
             ),
-            class_name="p-5 mt-4 border border-slate-200 bg-white rounded-lg",
+        ),
+        rx.el.p(
+            D.model_message,
+            class_name="mt-3 text-[10px] leading-relaxed text-slate-500",
+        ),
+        class_name="mb-4 rounded-lg border border-slate-200 bg-white p-5",
+    )
+
+
+def model() -> rx.Component:
+    """Show saved prediction comparisons or the clearly labeled demo fallback."""
+    return rx.el.div(
+        prediction_comparison_panel(),
+        rx.cond(
+            D.model_predictions.length() == 0,
+            rx.el.div(
+                rx.el.div(
+                    rx.el.div(
+                        rx.el.span(
+                            "MODEL",
+                            class_name="text-[9px] tracking-wider text-slate-500",
+                        ),
+                        rx.el.p(
+                            "K-Means clustering",
+                            class_name="mt-1 text-sm font-semibold text-slate-800",
+                        ),
+                    ),
+                    rx.el.div(
+                        rx.el.span(
+                            "INPUTS",
+                            class_name="text-[9px] tracking-wider text-slate-500",
+                        ),
+                        rx.el.p(
+                            "Sea ice · SST · Wind",
+                            class_name="mt-1 text-sm text-slate-700",
+                        ),
+                    ),
+                    rx.el.div(
+                        rx.el.span(
+                            "SILHOUETTE · DEMO",
+                            class_name="text-[9px] tracking-wider text-slate-500",
+                        ),
+                        rx.el.p(
+                            "0.61", class_name="mt-1 text-sm text-slate-700"
+                        ),
+                    ),
+                    rx.el.span(
+                        rx.icon("circle-check", class_name="h-4 w-4"),
+                        "Synthetic results loaded",
+                        class_name="flex gap-2 items-center text-xs text-teal-700 ml-auto",
+                    ),
+                    class_name="flex flex-wrap gap-8 border border-slate-200 bg-white p-4 rounded-lg mb-4",
+                ),
+                rx.el.div(
+                    map_panel(),
+                    rx.el.div(
+                        rx.el.h3(
+                            "Cluster summary",
+                            class_name="text-base font-semibold text-slate-800",
+                        ),
+                        rx.el.p(
+                            "Select a pattern to highlight its map sector.",
+                            class_name="text-xs text-slate-500",
+                        ),
+                        cluster_card(
+                            1,
+                            "━ Solid",
+                            "High concentration · colder surface",
+                            "34%",
+                        ),
+                        cluster_card(
+                            2,
+                            "▨ Diagonal",
+                            "Lower concentration · stronger winds",
+                            "26%",
+                        ),
+                        cluster_card(
+                            3,
+                            "┈ Dotted",
+                            "Intermediate concentration · mixed conditions",
+                            "22%",
+                        ),
+                        cluster_card(
+                            4,
+                            "╌ Alternating",
+                            "Sparse ice · warmer ocean",
+                            "18%",
+                        ),
+                        class_name="flex flex-col gap-3",
+                    ),
+                    class_name="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px] gap-4",
+                ),
+                rx.el.div(
+                    rx.el.h3(
+                        f"Cluster {S.cluster} · variable profile",
+                        class_name="text-base font-medium text-slate-800",
+                    ),
+                    rx.el.p(
+                        rx.match(
+                            S.cluster,
+                            (
+                                1,
+                                "Concentration 86% · SST −1.8 °C · wind 8.2 m/s",
+                            ),
+                            (
+                                2,
+                                "Concentration 52% · SST −0.7 °C · wind 16.1 m/s",
+                            ),
+                            (
+                                3,
+                                "Concentration 64% · SST −1.1 °C · wind 11.4 m/s",
+                            ),
+                            "Concentration 28% · SST 1.2 °C · wind 9.6 m/s",
+                        ),
+                        class_name="text-sm text-[#2f718b] mt-3",
+                    ),
+                    rx.el.p(
+                        "Illustrative cluster means, not feature importance. K-Means is an unsupervised method that groups similar inputs; no model was trained here.",
+                        class_name="text-xs text-slate-500 mt-3",
+                    ),
+                    rx.el.p(
+                        "Future research methods: Random Forest and Support Vector Machine — not available in this prototype.",
+                        class_name="text-xs text-slate-500 mt-3",
+                    ),
+                    class_name="p-5 mt-4 border border-slate-200 bg-white rounded-lg",
+                ),
+            ),
         ),
     )
 
@@ -1232,7 +1362,7 @@ def about() -> rx.Component:
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 rx.el.p(
-                    "Overview renders the explicitly selected uploaded CSV as a 316-column × 332-row pixel grid, with only mapped measurements and saved observations in its inspector. It is not a geographic projection. Mapped valid years/months filter pixels, computed cards and inspection together. Concentration and SST means, concentration pixel counts and CSV category counts use selected-period readings only. Monthly concentration analysis is shown only with at least two observed months; missing columns or valid readings have explicit unavailable states. Pixel counts are not area or Antarctic extent. Without a selected source, Overview remains the synthetic demo. Map Explorer, Compare and Model Insights remain synthetic. No satellite APIs or machine learning execution are connected. This is not production software or evidence of climate trends.",
+                    "Overview renders the explicitly selected uploaded CSV as a 316-column × 332-row pixel grid, with only mapped measurements and saved observations in its inspector. It is not a geographic projection. Prediction datasets are excluded from Overview, Compare and Map Explorer; Model Insights can compare them with the active Overview source by matching year and month. Accuracy is calculated from monthly means as 100% minus mean absolute error in percentage points, not as evidence of causal skill. Map Explorer and Compare remain synthetic demos, and no model training or satellite APIs are connected. This is not production software or evidence of climate trends.",
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 class_name="border-t border-slate-200 mt-8 pt-6",
@@ -1243,7 +1373,7 @@ def about() -> rx.Component:
                     class_name="text-lg font-medium text-slate-800",
                 ),
                 rx.el.p(
-                    "The Data tab accepts UTF-8 CSVs with up to 120,000 data rows and 10 columns, with a 20 MB (20 × 1,024 × 1,024 bytes) per-file cap. A full 104,912-row (332 × 316) grid fits within the row limit. Import, preview, edit, add or delete rows and rename or delete datasets. Select any saved dataset to map source columns and explicitly apply or remove its Overview source; only one dataset is active at a time. Changes and mappings persist after refresh; the four synthetic fixture cards remain separate UI demos.",
+                    "The Data tab accepts UTF-8 CSVs with up to 120,000 data rows and 10 columns, with a 20 MB (20 × 1,024 × 1,024 bytes) per-file cap. Import, preview and edit saved datasets. A dataset can be designated as Prediction by mapping its numeric concentration, year and month columns; prediction datasets are reserved for Model Insights and cannot be applied as an Overview source. Model Insights compares monthly prediction means against the active Overview source's mapped sea-ice concentration and dates. All values remain stored as strings and are parsed as numeric only for this comparison.",
                     class_name="mt-3 text-sm leading-7 text-slate-600",
                 ),
                 rx.el.p(

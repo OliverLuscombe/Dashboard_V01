@@ -63,6 +63,12 @@ class UploadedDataset(Base):
     overview_mapping_json: Mapped[str] = mapped_column(
         Text, default="{}", server_default=text("'{}'")
     )
+    data_type: Mapped[str] = mapped_column(
+        Text, default="measurement", server_default=text("'measurement'")
+    )
+    prediction_mapping_json: Mapped[str] = mapped_column(
+        Text, default="{}", server_default=text("'{}'")
+    )
 
 
 class UploadedDatasetRow(Base):

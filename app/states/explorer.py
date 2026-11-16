@@ -126,6 +126,7 @@ class Explorer(rx.State):
 
     @rx.event
     def navigate(self, page: str):
+        """Navigate sections and refresh the selected section's saved data."""
         self.page = page
         self.playing = False
         if page == "Model Insights" and "ML clusters" not in self.layers:
@@ -138,6 +139,10 @@ class Explorer(rx.State):
             from app.states.overview_grid import OverviewGrid
 
             return OverviewGrid.refresh
+        if page == "Model Insights":
+            from app.states.uploaded_data import UploadedData
+
+            return UploadedData.load_model_insights
 
     @rx.event
     def set_month(self, value: int):

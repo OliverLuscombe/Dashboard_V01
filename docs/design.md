@@ -65,6 +65,37 @@ and [`states/explorer.py`](../antarctic_sea_ice_dashboard/states/explorer.py).
 The shell and page layout are assembled in
 [`components/workspace.py`](../antarctic_sea_ice_dashboard/components/workspace.py).
 
+### Prediction comparison in Model Insights
+
+The legacy [`app/`](../app/) workspace adds the ability to classify each CSV as a measurement or
+prediction dataset. Measurement datasets remain eligible for the Overview
+source; prediction datasets are excluded from Overview and are reserved for
+Model Insights. A prediction mapping must use three different available
+columns: predicted sea-ice concentration, year, and month. Changing a dataset
+to prediction disables its Overview activation.
+
+Model Insights compares the selected prediction CSV with the currently active
+Overview measurement CSV. It validates finite concentration values in the
+0–100 range and valid year/month pairs, calculates an arithmetic mean for each
+dataset and month, and includes only month pairs present in both datasets.
+Displayed monthly accuracy is defined here as
+`max(0, 100 - abs(predicted_mean - observed_mean))`, in percentage points.
+Overall accuracy is the unweighted arithmetic mean of those monthly scores;
+months with more source rows are not given extra weight. If no eligible
+observation source or no matching valid month exists, the comparison is
+unavailable rather than synthesized.
+
+This is a simple descriptive score over user-provided monthly data, not a
+trained or validated model, nor a standard classification accuracy measure.
+When no prediction dataset is configured, the existing illustrative clustering
+demo remains clearly marked as synthetic.
+
+This workflow currently lives in the retained `app/` implementation, not the
+configured [`antarctic_sea_ice_dashboard/`](../antarctic_sea_ice_dashboard/)
+runtime described above. The default Reflex configuration therefore does not
+expose this new prediction workflow; switching the configured app entry point
+is a separate integration decision.
+
 The retained [`app/states/overview_grid.py`](../app/states/overview_grid.py)
 implements a distinct uploaded-data raster workflow on a 316 × 332 pixel grid.
 Its row-order mode, period selection, summary cards, categorical layers, and
@@ -108,7 +139,8 @@ pixel inspection behavior are described in
 supports online/offline Alembic execution. The ordered revisions in
 [`db_migrations/versions/`](../db_migrations/versions/) first create the shared
 dataset/row tables, then add map-source activation and mapping fields. Each
-revision includes a downgrade for its schema changes.
+revision includes a downgrade for its schema changes. The latest revision
+adds the measurement/prediction dataset type and saved prediction-column map.
 
 ## External libraries, services, and attribution
 
