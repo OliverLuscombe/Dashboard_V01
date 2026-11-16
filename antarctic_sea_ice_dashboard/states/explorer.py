@@ -165,6 +165,12 @@ class Explorer(rx.State):
             from antarctic_sea_ice_dashboard.states.antarctic_globe import AntarcticGlobe
 
             yield AntarcticGlobe.refresh
+        if page == "Model Insights":
+            from antarctic_sea_ice_dashboard.states.model_insights import (
+                PredictionInsights,
+            )
+
+            yield PredictionInsights.refresh
 
     @rx.event
     def refresh_map(self):

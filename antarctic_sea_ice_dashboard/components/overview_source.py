@@ -165,7 +165,7 @@ def source_configuration() -> rx.Component:
             class_name="flex flex-wrap items-center gap-3",
         ),
         rx.el.p(
-            "Map Latitude and Longitude and at least one numeric measurement column. New imports include the date entered before upload; older files may remain undated or be assigned a date here. Applying this file does not deactivate other CSV layers.",
+            "Map Latitude, Longitude, and at least one numeric measurement column. Choose Prediction to mark model output; prediction datasets are reserved for Model Insights and are excluded from Map Explorer and Compare. New imports include the date entered before upload; older files may remain undated or be assigned a date here. Applying a prediction mapping saves it for Model Insights without activating it as a globe layer.",
             class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
         ),
         rx.el.form(
@@ -211,7 +211,7 @@ def source_configuration() -> rx.Component:
                         rx.cond(
                             D.selected_source_active,
                             "Save mapping and keep active",
-                            "Apply as CSV layer",
+                            "Save mapping",
                         ),
                     ),
                     type="submit",
@@ -250,7 +250,7 @@ def source_configuration() -> rx.Component:
             class_name="mt-4",
         ),
         rx.el.p(
-            "Applying adds this CSV alongside other active layers. Mapping edits stay unsaved until applied. Snapshot groups are selected in Map Explorer.",
+            "Saving a measurement mapping applies this CSV alongside other active globe layers. Saving a Prediction mapping reserves it for Model Insights and does not add it to the globe or Compare. Snapshot groups are selected in Map Explorer.",
             class_name="mt-2 text-[10px] leading-relaxed text-slate-600",
         ),
         class_name="border-b border-slate-200 p-4",

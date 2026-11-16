@@ -13,6 +13,9 @@ from antarctic_sea_ice_dashboard.components.snapshot_comparison import (
 from antarctic_sea_ice_dashboard.states.antarctic_globe import (
     AntarcticGlobe as Globe,
 )
+from antarctic_sea_ice_dashboard.states.model_insights import (
+    PredictionInsights as Insights,
+)
 
 
 BUTTON = "inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-sky-800 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
@@ -159,7 +162,7 @@ def header() -> rx.Component:
                         ),
                     ),
                     ("Compare", "Snapshot comparison"),
-                    ("Model Insights", "Model output availability"),
+                    ("Model Insights", "Prediction accuracy"),
                     "Workspace",
                 ),
                 class_name="hidden sm:flex items-center gap-2 text-xs text-slate-600",
@@ -209,7 +212,7 @@ def title() -> rx.Component:
                     ),
                     (
                         "Model Insights",
-                        "Uploaded model outputs only; no model is trained by this prototype.",
+                        "Compare uploaded predictions with recorded concentration for the same Year/Month snapshot.",
                     ),
                     (
                         "Data",
@@ -1073,23 +1076,65 @@ def legacy_model() -> rx.Component:
 
 def model() -> rx.Component:
     return rx.el.div(
-        globe_map(),
         rx.el.section(
-            rx.icon(
-                "info", class_name="mt-0.5 h-4 w-4 shrink-0 text-[#286180]"
-            ),
             rx.el.div(
-                rx.el.h2(
-                    "No uploaded model output is available",
-                    class_name="text-sm font-semibold text-slate-800",
+                rx.el.div(
+                    rx.el.h2(
+                        "Sea-ice concentration prediction",
+                        class_name="text-sm font-semibold text-slate-800",
+                    ),
+                    rx.el.p(
+                        "Choose a saved Prediction dataset. Its mapped values are compared with recorded sea-ice concentration from the same Year/Month snapshot.",
+                        class_name="mt-1 text-[11px] leading-relaxed text-slate-600",
+                    ),
                 ),
-                rx.el.p(
-                    "The globe shows the selected mapped observation, not a model result. This prototype does not train a model or infer clusters from the CSV, so it does not display synthetic cluster labels or scores.",
-                    class_name="mt-2 text-xs leading-relaxed text-slate-600",
+                rx.el.div(
+                    rx.el.label(
+                        "Prediction dataset",
+                        html_for="prediction-dataset",
+                        class_name="mb-1 block text-[11px] font-medium text-slate-600",
+                    ),
+                    rx.el.select(
+                        rx.cond(
+                            Insights.predictions.length() == 0,
+                            rx.el.option(
+                                "No dated Prediction datasets available",
+                                value="0",
+                            ),
+                        ),
+                        rx.foreach(
+                            Insights.predictions,
+                            lambda dataset: rx.el.option(
+                                dataset["name"] + " · " + dataset["snapshot"],
+                                value=dataset["id"],
+                            ),
+                        ),
+                        id="prediction-dataset",
+                        value=Insights.selected_prediction_id,
+                        on_change=Insights.select_prediction,
+                        disabled=Insights.loading
+                        | (Insights.predictions.length() == 0),
+                        class_name="min-h-9 w-full min-w-64 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 focus-visible:outline-2 focus-visible:outline-sky-700 disabled:opacity-70",
+                    ),
+                    class_name="min-w-0",
                 ),
+                rx.el.button(
+                    rx.icon("refresh-cw", class_name="h-3.5 w-3.5"),
+                    "Refresh predictions",
+                    on_click=Insights.refresh,
+                    disabled=Insights.loading,
+                    class_name=BUTTON,
+                ),
+                class_name="grid grid-cols-1 items-end gap-3 md:grid-cols-[minmax(0,1fr)_minmax(16rem,0.8fr)_auto]",
             ),
-            class_name="mt-4 flex gap-3 rounded-lg border border-slate-200 bg-white p-4",
+            rx.el.p(
+                Insights.message,
+                role="status",
+                class_name="mt-3 text-[10px] leading-relaxed text-slate-500",
+            ),
+            class_name="mb-4 rounded-lg border border-slate-200 bg-white p-4",
         ),
+        globe_map(),
     )
 
 
@@ -1190,7 +1235,7 @@ def about() -> rx.Component:
                     class_name="text-lg font-medium text-slate-800",
                 ),
                 rx.el.p(
-                    "Map Explorer displays a selected CSV snapshot. Compare calculates the difference between two mapped Year/Month snapshots, and Model Insights describes the need for actual model output.",
+                    "Map Explorer displays observations. Compare compares two mapped snapshots. Model Insights evaluates a mapped Prediction against recorded sea-ice concentration for the same Year/Month.",
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 class_name="border-t border-slate-200 mt-8 pt-6",
@@ -1205,7 +1250,7 @@ def about() -> rx.Component:
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 rx.el.p(
-                    "Map Explorer and Model Insights use the south-polar globe and active uploaded CSV layers. Geographic observations are positioned from mapped Latitude and Longitude and rendered in one batched WebGL layer; concentration is coloured on a 0–100% scale. Other mapped numeric measurements can be selected and are normalized only for visualization. Compare calculates the difference between mean mapped values for any two available Year/Month snapshots, including two months in the same year. This is a geographic display, not an ice-thickness or terrain model. Model Insights does not fabricate results when real model output is unavailable. No satellite APIs or machine-learning execution are connected. This is not production software or evidence of climate trends.",
+                    "Map Explorer displays mapped observation layers, while Prediction datasets are excluded from Map Explorer and Compare. Model Insights matches predicted and recorded concentrations at shared geographic coordinates in the same Year/Month snapshot. Its accuracy is 100% minus mean absolute error in concentration percentage points; it is not a trained model score or proof of causal skill. This is a geographic display, not an ice-thickness or terrain model. No satellite APIs or machine-learning execution are connected. This is not production software or evidence of climate trends.",
                     class_name="text-sm text-slate-600 leading-7 mt-3",
                 ),
                 class_name="border-t border-slate-200 mt-8 pt-6",
@@ -1216,7 +1261,7 @@ def about() -> rx.Component:
                     class_name="text-lg font-medium text-slate-800",
                 ),
                 rx.el.p(
-                    "The Data tab accepts UTF-8 CSVs with up to 400,000 data rows and 10 columns, with a 20 MB (20 × 1,024 × 1,024 bytes) per-file cap. A Year and Month are required before each import and are saved as snapshot metadata for every row in that file. Import, preview, edit, add or delete rows and rename or delete datasets. Map geographic coordinates and numeric measurements, then apply or remove CSV layers; multiple layers can be active in the same snapshot. Changes and mappings persist after refresh.",
+                    "The Data tab accepts UTF-8 CSVs with up to 400,000 data rows and 10 columns, with a 20 MB (20 × 1,024 × 1,024 bytes) per-file cap. A Year and Month are required before each import and are saved as snapshot metadata for every row in that file. Map geographic coordinates and numeric measurements, including Prediction. Applying a Prediction mapping saves the dataset for Model Insights without activating it as a globe layer. Other mapped observations can be applied to Map Explorer and Compare. Changes and mappings persist after refresh.",
                     class_name="mt-3 text-sm leading-7 text-slate-600",
                 ),
                 rx.el.p(
@@ -1298,7 +1343,7 @@ def workspace() -> rx.Component:
             ),
             rx.el.footer(
                 rx.icon("flask-conical", class_name="h-3 w-3 shrink-0"),
-                "Prototype — globe colours show uploaded CSV readings, not validated scientific observations. Compare requires mapped snapshots; Model Insights requires real model output.",
+                "Prototype — globe colours show uploaded CSV observations, not validated science. Prediction accuracy compares uploaded output with recorded concentration; no model is trained.",
                 rx.el.span(
                     "NOT FOR SCIENTIFIC USE",
                     class_name="hidden lg:block ml-auto text-[8px] tracking-wider",

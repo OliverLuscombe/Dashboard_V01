@@ -5,6 +5,10 @@ import reflex as rx
 from antarctic_sea_ice_dashboard.states.antarctic_globe import (
     AntarcticGlobe as Globe,
 )
+from antarctic_sea_ice_dashboard.states.explorer import Explorer as S
+from antarctic_sea_ice_dashboard.states.model_insights import (
+    PredictionInsights as Insights,
+)
 from antarctic_sea_ice_dashboard.states.uploaded_data import DatasetSummary
 
 
@@ -176,10 +180,26 @@ def globe_map() -> rx.Component:
                 rx.cond(Globe.status == "loading", "Loading…", Globe.valid),
                 "Across enabled CSV layers",
             ),
-            stat_card(
-                "Mean selected measurement",
-                rx.cond(Globe.average != "", Globe.average, "—"),
-                Globe.measurement_label,
+            rx.cond(
+                S.page == "Model Insights",
+                stat_card(
+                    "Model accuracy",
+                    rx.cond(
+                        Insights.loading,
+                        "Calculating…",
+                        rx.cond(
+                            Insights.accuracy != "",
+                            Insights.accuracy,
+                            "—",
+                        ),
+                    ),
+                    f"{Insights.matched_points:,} matched locations · {Insights.observation_files} recorded datasets · {Insights.snapshot}",
+                ),
+                stat_card(
+                    "Mean selected measurement",
+                    rx.cond(Globe.average != "", Globe.average, "—"),
+                    Globe.measurement_label,
+                ),
             ),
             stat_card(
                 "Coordinate rows omitted",

@@ -155,9 +155,16 @@ def catalogue_item(dataset: DatasetSummary) -> rx.Component:
             ),
             class_name="flex items-start gap-2",
         ),
+        rx.cond(
+            dataset["is_prediction"],
+            rx.el.span(
+                "PREDICTION",
+                class_name="mt-2 inline-flex rounded bg-violet-50 px-2 py-1 text-[9px] font-medium tracking-wide text-violet-800",
+            ),
+        ),
         rx.el.p(
             f"{dataset['rows']:,} rows · {dataset['columns']} columns",
-            class_name="mt-2 text-left text-[10px] text-slate-500",
+            class_name="mt-1 text-left text-[10px] text-slate-500",
         ),
         rx.el.p(
             f"{dataset['snapshot']} · "
@@ -627,7 +634,7 @@ def uploaded_workspace() -> rx.Component:
                     class_name="text-sm font-medium text-[#172e40]",
                 ),
                 rx.el.p(
-                    "Uploaded datasets and edits are stored and visible to everyone using this prototype. There is no sign-in or private access. Do not upload confidential or personal data. Map Latitude, Longitude, and at least one supported measurement, then apply a CSV layer. Multiple active layers are grouped by their Year/Month snapshot. Refresh Map Explorer after editing CSV rows.",
+                    "Uploaded datasets and edits are stored and visible to everyone using this prototype. There is no sign-in or private access. Do not upload confidential or personal data. Map Latitude, Longitude, and supported numeric measurements. A Prediction mapping is available only in Model Insights; other measurements can be applied as CSV layers for Map Explorer and Compare. Refresh affected pages after editing CSV rows.",
                     class_name="mt-1 text-xs leading-relaxed text-slate-600",
                 ),
             ),

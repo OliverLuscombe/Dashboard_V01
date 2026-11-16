@@ -30,6 +30,7 @@ MAPPING_LABELS: dict[str, str] = {
     "sea_surface_temperature": "Sea-surface temperature (°C)",
     "wind_speed": "Wind speed (m/s)",
     "air_temperature": "Air temperature (°C)",
+    "prediction": "Prediction · sea-ice concentration (%)",
 }
 
 
@@ -51,6 +52,8 @@ class DatasetSummary(TypedDict):
     snapshot: str
     group_key: str
     map_message: str
+    model_ready: bool
+    is_prediction: bool
 
 
 class PreviewRow(TypedDict):
@@ -138,6 +141,19 @@ class UploadedData(rx.State):
                 "airt",
                 "airtempc",
             ],
+            "prediction": [
+                "prediction",
+                "predicted",
+                "predictedconcentration",
+                "predictediceconcentration",
+                "predictedseaiceconcentration",
+                "predictedseaiceconcentrationpercent",
+                "predictedsic",
+                "predictionconcentration",
+                "sicprediction",
+                "modelprediction",
+                "modeloutput",
+            ],
         }
         normalized = [
             (re.sub(r"[^a-z0-9]", "", column.casefold()), column)
@@ -215,6 +231,7 @@ class UploadedData(rx.State):
                 "sea_surface_temperature",
                 "wind_speed",
                 "air_temperature",
+                "prediction",
             )
         ):
             raise ValueError(
@@ -299,6 +316,7 @@ class UploadedData(rx.State):
         snapshot = "Undated"
         group_key = "undated"
         map_ready = False
+        model_ready = False
         map_message = (
             "Map Latitude, Longitude, and a supported measurement in Data."
         )
@@ -313,8 +331,16 @@ class UploadedData(rx.State):
             if year and month:
                 group_key = f"{int(year):04d}-{int(month):02d}"
                 snapshot = group_key
-            map_ready = True
-            map_message = ""
+            if saved_mapping.get("prediction"):
+                model_ready = bool(year and month)
+                map_message = (
+                    "Prediction data is reserved for Model Insights."
+                    if model_ready
+                    else "Set a snapshot year and month to use this prediction in Model Insights."
+                )
+            else:
+                map_ready = True
+                map_message = ""
         except ValueError as error:
             map_message = str(error)
         return {
@@ -329,6 +355,8 @@ class UploadedData(rx.State):
             "snapshot": snapshot,
             "group_key": group_key,
             "map_message": map_message,
+            "model_ready": model_ready,
+            "is_prediction": bool(saved_mapping.get("prediction")),
         }
 
     def _clear_editor(self):
@@ -631,7 +659,7 @@ class UploadedData(rx.State):
                     mapping,
                 )
                 dataset.map_mapping_json = json.dumps(clean, ensure_ascii=True)
-                dataset.map_layer_active = True
+                dataset.map_layer_active = not bool(clean.get("prediction"))
 
     @staticmethod
     def _set_layer_active(dataset_id: int, active: bool):
@@ -649,6 +677,10 @@ class UploadedData(rx.State):
                 if active:
                     columns = json.loads(dataset.column_names_json)
                     mapping = json.loads(dataset.map_mapping_json)
+                    if mapping.get("prediction"):
+                        raise ValueError(
+                            "Prediction datasets are reserved for Model Insights and cannot be activated as globe layers."
+                        )
                     clean = UploadedData._validate_mapping(
                         columns, dataset.row_count, mapping
                     )
@@ -703,7 +735,11 @@ class UploadedData(rx.State):
                 self.source_success = (
                     "Map source removed; its saved mapping is retained for reuse."
                     if remove
-                    else "CSV layer applied. It can be displayed with other active layers from the same Year/Month snapshot."
+                    else (
+                        "Prediction mapping saved for Model Insights. This dataset is not activated as a globe layer."
+                        if mapping.get("prediction")
+                        else "CSV layer applied. It can be displayed with other active layers from the same Year/Month snapshot."
+                    )
                 )
             yield UploadedData.load_catalogue
         except Exception as e:
