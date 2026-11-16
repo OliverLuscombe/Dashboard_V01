@@ -1106,15 +1106,15 @@ def model() -> rx.Component:
                             Insights.predictions,
                             lambda dataset: rx.el.option(
                                 dataset["name"] + " · " + dataset["snapshot"],
-                                value=dataset["id"],
+                                value=dataset["id"].to_string(),
                             ),
                         ),
                         id="prediction-dataset",
-                        value=Insights.selected_prediction_id,
+                        value=Insights.selected_prediction_id.to_string(),
                         on_change=Insights.select_prediction,
                         disabled=Insights.loading
                         | (Insights.predictions.length() == 0),
-                        class_name="min-h-9 w-full min-w-64 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 focus-visible:outline-2 focus-visible:outline-sky-700 disabled:opacity-70",
+                        class_name="appearance-none min-h-9 w-full min-w-64 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 focus-visible:outline-2 focus-visible:outline-sky-700 disabled:opacity-70",
                     ),
                     class_name="min-w-0",
                 ),

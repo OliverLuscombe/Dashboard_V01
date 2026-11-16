@@ -1,5 +1,3 @@
-"""Configure Alembic metadata discovery and transactional migration execution."""
-
 from __future__ import annotations
 
 import importlib
