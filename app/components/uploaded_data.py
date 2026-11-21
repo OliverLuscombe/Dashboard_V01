@@ -1,9 +1,12 @@
+"""Render the legacy upload, dataset catalogue, preview, and edit interface."""
+
 import reflex as rx
 from app.states.uploaded_data import (
     UploadedData as D,
     DatasetSummary,
     PreviewRow,
     EditorField,
+    MappingField,
     MAX_ROWS,
 )
 from app.components.overview_source import active_source, source_configuration
@@ -16,6 +19,7 @@ INPUT = "w-full min-h-9 rounded-md border border-slate-200 bg-white px-3 py-2 te
 
 
 def import_zone() -> rx.Component:
+    """Render the legacy single-file CSV import control and guidance."""
     return rx.el.section(
         rx.el.h2(
             "Import CSV", class_name="text-sm font-semibold text-[#172e40]"
@@ -85,7 +89,7 @@ def import_zone() -> rx.Component:
             class_name="mt-3 text-[10px] leading-relaxed text-slate-500",
         ),
         rx.el.p(
-            "Parsed contents are saved, not the raw file. A CSV is designated for Overview only when actively selected and applied below; importing alone does not select it. Other demo pages remain synthetic.",
+            "Parsed contents are saved, not the raw file. A measurement CSV is designated for Overview only when actively selected and applied below; prediction datasets are reserved for Model Insights.",
             class_name="mt-2 text-[10px] leading-relaxed text-slate-500",
         ),
         class_name="border-b border-slate-200 p-4",
@@ -111,7 +115,7 @@ def catalogue_item(dataset: DatasetSummary) -> rx.Component:
             class_name="flex items-start gap-2",
         ),
         rx.el.p(
-            f"{dataset['rows']:,} rows · {dataset['columns']} columns",
+            f"{dataset['data_type']} · {dataset['rows']:,} rows · {dataset['columns']} columns",
             class_name="mt-2 text-left text-[10px] text-slate-500",
         ),
         rx.el.p(
@@ -355,6 +359,96 @@ def editor_field(field: EditorField) -> rx.Component:
     )
 
 
+def prediction_mapping_select(field: MappingField) -> rx.Component:
+    """Render a saved-column selector for one prediction mapping field."""
+    return rx.el.label(
+        field["label"],
+        rx.el.select(
+            rx.el.option("Choose a column", value=""),
+            rx.foreach(
+                D.columns, lambda column: rx.el.option(column, value=column)
+            ),
+            name=field["name"],
+            default_value=field["value"],
+            disabled=D.dataset_type_saving | D.loading | D.importing,
+            class_name=INPUT,
+        ),
+        class_name="min-w-0 text-[11px] font-medium text-slate-600",
+    )
+
+
+def dataset_type_configuration() -> rx.Component:
+    """Render dataset classification and prediction/date column controls."""
+    return rx.el.section(
+        rx.el.h3(
+            "Dataset type",
+            class_name="text-sm font-semibold text-[#172e40]",
+        ),
+        rx.el.p(
+            "Prediction datasets are reserved for Model Insights and are excluded from Overview, Compare and Map Explorer. Map one numeric predicted sea-ice concentration column and its year/month columns.",
+            class_name="mt-1 text-[11px] leading-relaxed text-slate-600",
+        ),
+        rx.el.form(
+            rx.el.label(
+                "Type",
+                rx.el.select(
+                    rx.el.option("Measurement", value="measurement"),
+                    rx.el.option("Prediction", value="prediction"),
+                    name="data_type",
+                    value=D.selected_data_type,
+                    on_change=D.set_dataset_type,
+                    disabled=D.dataset_type_saving | D.loading | D.importing,
+                    class_name=INPUT,
+                ),
+                class_name="block max-w-sm text-[11px] font-medium text-slate-600",
+            ),
+            rx.cond(
+                D.selected_data_type == "prediction",
+                rx.el.div(
+                    rx.foreach(
+                        D.prediction_mapping_fields,
+                        prediction_mapping_select,
+                    ),
+                    class_name="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3",
+                ),
+            ),
+            rx.el.p(
+                "Only finite numeric concentration values from 0 to 100 and valid year/month pairs are included. Predictions and recorded observations are averaged by month before comparison.",
+                class_name="mt-2 text-[10px] leading-relaxed text-slate-500",
+            ),
+            rx.el.button(
+                rx.cond(
+                    D.dataset_type_saving,
+                    "Saving…",
+                    "Save dataset type",
+                ),
+                type="submit",
+                disabled=D.dataset_type_saving | D.loading | D.importing,
+                class_name=PRIMARY,
+            ),
+            rx.cond(
+                D.dataset_type_error != "",
+                rx.el.p(
+                    D.dataset_type_error,
+                    role="alert",
+                    class_name="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700",
+                ),
+            ),
+            rx.cond(
+                D.dataset_type_success != "",
+                rx.el.p(
+                    D.dataset_type_success,
+                    role="status",
+                    class_name="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-xs text-green-700",
+                ),
+            ),
+            on_submit=D.save_dataset_type,
+            class_name="mt-3",
+        ),
+        class_name="border-b border-slate-200 p-4",
+    )
+
+
 def row_editor() -> rx.Component:
     return rx.el.section(
         rx.cond(
@@ -539,7 +633,15 @@ def dataset_editor() -> rx.Component:
                     ),
                     class_name="border-b border-slate-200 p-4",
                 ),
-                source_configuration(),
+                dataset_type_configuration(),
+                rx.cond(
+                    D.selected_data_type == "prediction",
+                    rx.el.p(
+                        "This dataset is available in Model Insights only; its rows cannot be applied to Overview.",
+                        class_name="m-4 rounded-md border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800",
+                    ),
+                    source_configuration(),
+                ),
                 preview(),
                 row_editor(),
                 delete_confirmation(),
@@ -567,6 +669,7 @@ def dataset_editor() -> rx.Component:
 
 
 def uploaded_workspace() -> rx.Component:
+    """Compose the legacy CSV catalogue, preview, and edit workspace."""
     return rx.el.div(
         rx.el.div(
             rx.icon("users", class_name="h-5 w-5 shrink-0 text-[#36758b]"),
@@ -576,7 +679,7 @@ def uploaded_workspace() -> rx.Component:
                     class_name="text-sm font-medium text-[#172e40]",
                 ),
                 rx.el.p(
-                    "Uploaded datasets and edits are stored and visible to everyone using this prototype. There is no sign-in or private access. Do not upload confidential or personal data. CSV only changes the designated Overview source when actively selected and applied. Overview renders the applied source's mapped readings on a pixel grid; refresh the map after edits. Overview cards and inspection use the selected mapped period. Monthly concentration analysis appears when mapped month and concentration columns provide at least two observed months. Other demo pages remain synthetic.",
+                    "Uploaded datasets and edits are stored and visible to everyone using this prototype. There is no sign-in or private access. Do not upload confidential or personal data. Measurement CSVs can be applied as the Overview source; prediction datasets are available only in Model Insights. Overview renders the applied source's mapped readings on a pixel grid; refresh the map after edits. Monthly concentration analysis uses observed months only. Compare and Map Explorer remain synthetic demos.",
                     class_name="mt-1 text-xs leading-relaxed text-slate-600",
                 ),
             ),

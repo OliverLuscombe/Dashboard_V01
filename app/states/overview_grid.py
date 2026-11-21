@@ -1,3 +1,5 @@
+"""Rasterize and summarize the legacy fixed-grid Overview from saved CSV rows."""
+
 import reflex as rx
 import asyncio
 import calendar
@@ -104,6 +106,8 @@ class GridResult(TypedDict):
 
 
 class OverviewGrid(rx.State):
+    """Manage selected grid periods, rendered layers, summaries, and inspection."""
+
     periods: list[GridPeriod] = []
     selected_year: int = 0
     selected_month: int = 0
@@ -340,6 +344,7 @@ class OverviewGrid(rx.State):
         layer: str,
         result: GridResult,
     ) -> tuple[Image.Image, Image.Image]:
+        """Render one selected grid layer and collect pixel-level diagnostics."""
         indices = OverviewGrid._indices(columns, mapping)
         values = array("d", [math.nan]) * GRID_ROWS
         occupied = bytearray(GRID_ROWS)
@@ -469,6 +474,7 @@ class OverviewGrid(rx.State):
         year: int = 0,
         month: int = 0,
     ) -> tuple[Image.Image, Image.Image]:
+        """Discover valid periods, aggregate monthly values, and rasterize one period."""
         indices = OverviewGrid._indices(columns, mapping)
         fixed = UploadedData._fixed_dates(mapping)
         for key in ("year", "month"):
@@ -784,6 +790,7 @@ class OverviewGrid(rx.State):
 
     @rx.event
     def refresh(self):
+        """Reload the active source and request a fresh period-specific raster."""
         self.request_id += 1
         self.inspect_id += 1
         self.inspecting = False
@@ -891,6 +898,7 @@ class OverviewGrid(rx.State):
         month: int = 0,
         source_id: int = 0,
     ):
+        """Build the selected grid off the event loop and discard stale outputs."""
         try:
             result = await asyncio.to_thread(
                 OverviewGrid._render, preferred, year, month, source_id
@@ -1150,6 +1158,7 @@ class OverviewGrid(rx.State):
         year: int = 0,
         month: int = 0,
     ):
+        """Read the selected period's saved pixel without accepting stale results."""
         try:
             heading, details = await asyncio.to_thread(
                 OverviewGrid._lookup, dataset_id, layer, x, y, year, month

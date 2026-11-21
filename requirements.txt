@@ -1,6 +1,6 @@
 
 reflex[db]==0.10.0
-xy[reflex]==0.0.8
+xy[reflex]==0.0.9
 faker
 psycopg[binary]>=3.1.8
 pillow

@@ -1,3 +1,5 @@
+"""Render source-selection and field-mapping controls for the legacy Overview."""
+
 import reflex as rx
 from app.states.uploaded_data import UploadedData as D, MappingField, GRID_ROWS
 
@@ -115,7 +117,7 @@ def active_source() -> rx.Component:
             class_name="flex flex-wrap items-center justify-between gap-3",
         ),
         rx.el.p(
-            "A CSV is designated for Overview only when you explicitly apply it. Return to Overview to render its mapped readings on the 316-column × 332-row pixel grid and inspect saved pixels. Refresh the Overview map after editing data. CSV-mapped dates or manual date metadata filter the grid, summaries and inspector. Monthly concentration analysis requires concentration readings in at least two observed months. A fixed month gives one month only; other demo pages remain synthetic.",
+            "A measurement CSV is designated for Overview only when you explicitly apply it. Return to Overview to render its mapped readings on the 316-column × 332-row pixel grid and inspect saved pixels. Prediction datasets are reserved for Model Insights. Refresh the Overview map after editing data. CSV-mapped dates or manual date metadata filter the grid, summaries and inspector. Monthly concentration analysis requires concentration readings in at least two observed months.",
             class_name="mt-2 text-[11px] leading-relaxed text-slate-600",
         ),
         rx.cond(
@@ -153,6 +155,7 @@ def active_source() -> rx.Component:
 
 
 def source_configuration() -> rx.Component:
+    """Render field mapping and activation controls for the legacy grid source."""
     return rx.el.section(
         rx.el.div(
             rx.el.h3(

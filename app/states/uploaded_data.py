@@ -1,13 +1,16 @@
+"""Manage CSV persistence and saved-data editing for the legacy workspace."""
+
 import reflex as rx
 import asyncio
 import csv
 import io
 import json
 import logging
+import math
 import re
-from uuid import uuid4
 from pathlib import PurePath
 from typing import Any, TypedDict
+from uuid import uuid4
 
 from sqlalchemy import delete, func, insert, select, text, update
 from app.models import UploadedDataset, UploadedDatasetRow
@@ -33,6 +36,11 @@ MAPPING_LABELS: dict[str, str] = {
     "marginal_ice_zone": "Marginal ice zone · optional",
     "cluster": "Cluster · optional",
 }
+PREDICTION_MAPPING_LABELS: dict[str, str] = {
+    "prediction": "Predicted sea-ice concentration (%) · numeric",
+    "year": "Prediction year",
+    "month": "Prediction month",
+}
 
 
 class MappingField(TypedDict):
@@ -48,6 +56,16 @@ class DatasetSummary(TypedDict):
     rows: int
     columns: int
     created: str
+    data_type: str
+
+
+class PredictionComparisonRow(TypedDict):
+    """Monthly prediction and observation means with a bounded error score."""
+
+    period: str
+    prediction: float
+    observed: float
+    accuracy: float
 
 
 class PreviewRow(TypedDict):
@@ -63,6 +81,8 @@ class EditorField(TypedDict):
 
 
 class UploadedData(rx.State):
+    """Coordinate legacy CSV imports, data previews, edits, and source mappings."""
+
     catalogue: list[DatasetSummary] = []
     selected_id: int = 0
     selected_name: str = ""
@@ -95,6 +115,17 @@ class UploadedData(rx.State):
     source_success: str = ""
     source_saving: bool = False
     mapping_revision: int = 0
+    selected_data_type: str = "measurement"
+    prediction_mapping_fields: list[MappingField] = []
+    dataset_type_error: str = ""
+    dataset_type_success: str = ""
+    dataset_type_saving: bool = False
+    model_predictions: list[DatasetSummary] = []
+    model_prediction_id: int = 0
+    model_actual_name: str = ""
+    model_comparison: list[PredictionComparisonRow] = []
+    model_accuracy: float = -1
+    model_message: str = "Configure a prediction dataset in Data to compare it with the active Overview source."
 
     @rx.var
     def page_count(self) -> int:
@@ -157,6 +188,159 @@ class UploadedData(rx.State):
             )
             for field in MAPPING_LABELS
         }
+
+    @staticmethod
+    def _suggest_prediction_mapping(columns: list[str]) -> dict[str, str]:
+        """Suggest prediction and date fields from common CSV header aliases."""
+        aliases = {
+            "prediction": {
+                "prediction",
+                "predicted",
+                "predictedconcentration",
+                "predictedseaiceconcentration",
+                "predictedseaiceconcentrationpercent",
+                "predictionconcentration",
+                "predictionseaiceconcentration",
+                "sicprediction",
+            },
+            "year": {"year", "predictionyear"},
+            "month": {"month", "predictionmonth"},
+        }
+        normalized = [
+            (re.sub(r"[^a-z0-9]", "", column.casefold()), column)
+            for column in columns
+        ]
+        return {
+            field: next(
+                (column for key, column in normalized if key in aliases[field]),
+                "",
+            )
+            for field in PREDICTION_MAPPING_LABELS
+        }
+
+    @staticmethod
+    def _validate_prediction_mapping(
+        columns: list[str], mapping: dict[str, str]
+    ) -> dict[str, str]:
+        """Require distinct prediction, year, and month columns from the CSV."""
+        clean = {
+            field: str(mapping.get(field, "")).strip()
+            for field in PREDICTION_MAPPING_LABELS
+        }
+        if any(not value or value not in columns for value in clean.values()):
+            raise ValueError(
+                "Choose available prediction, year and month columns before saving this dataset type."
+            )
+        if len(set(clean.values())) != len(clean):
+            raise ValueError(
+                "Prediction, year and month must use three different columns."
+            )
+        return clean
+
+    @staticmethod
+    def _numeric_cell(value: object) -> float | None:
+        """Parse a finite numeric cell without accepting booleans or text labels."""
+        if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+            return None
+        raw = str(value).strip()
+        if not re.fullmatch(
+            r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?",
+            raw,
+        ):
+            return None
+        try:
+            number = float(raw)
+        except (ValueError, OverflowError):
+            return None
+        return number if math.isfinite(number) else None
+
+    @staticmethod
+    def _monthly_measurements(
+        rows: Any,
+        columns: list[str],
+        mapping: dict[str, str],
+        measurement_key: str,
+    ) -> dict[tuple[int, int], float]:
+        """Average valid concentration rows by their validated year and month."""
+        indices = {
+            key: columns.index(mapping[key])
+            for key in (measurement_key, "year", "month")
+            if mapping.get(key) in columns
+        }
+        if measurement_key not in indices:
+            return {}
+        fixed_dates = {
+            key: UploadedData._numeric_cell(mapping.get(f"fixed_{key}", ""))
+            for key in ("year", "month")
+        }
+        if not all(
+            key in indices or fixed_dates[key] is not None
+            for key in ("year", "month")
+        ):
+            return {}
+        totals: dict[tuple[int, int], tuple[float, int]] = {}
+        for raw in rows:
+            # Ignore malformed saved cells rather than treating them as readings.
+            try:
+                cells = json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(cells, list) or len(cells) != len(columns):
+                continue
+            value = UploadedData._numeric_cell(cells[indices[measurement_key]])
+            if value is None or not 0 <= value <= 100:
+                continue
+            period: list[int] = []
+            for key, bound in (("year", 9999), ("month", 12)):
+                date_value = (
+                    UploadedData._numeric_cell(cells[indices[key]])
+                    if key in indices
+                    else fixed_dates[key]
+                )
+                if (
+                    date_value is None
+                    or not date_value.is_integer()
+                    or not 1 <= date_value <= bound
+                ):
+                    break
+                period.append(int(date_value))
+            if len(period) != 2:
+                continue
+            key = (period[0], period[1])
+            total, count = totals.get(key, (0.0, 0))
+            totals[key] = (total + value, count + 1)
+        # Return one arithmetic mean for each valid year/month pair.
+        return {
+            period: total / count for period, (total, count) in totals.items()
+        }
+
+    @staticmethod
+    def _compare_monthly_values(
+        predicted: dict[tuple[int, int], float],
+        observed: dict[tuple[int, int], float],
+    ) -> tuple[list[PredictionComparisonRow], float | None]:
+        """Score only matched monthly means using bounded absolute-error accuracy."""
+        comparison: list[PredictionComparisonRow] = []
+        for year, month in sorted(predicted.keys() & observed.keys()):
+            prediction_value = predicted[(year, month)]
+            observed_value = observed[(year, month)]
+            # Convert percentage-point error into the dashboard's bounded score.
+            comparison.append(
+                {
+                    "period": f"{year}-{month:02d}",
+                    "prediction": prediction_value,
+                    "observed": observed_value,
+                    "accuracy": max(
+                        0.0, 100.0 - abs(prediction_value - observed_value)
+                    ),
+                }
+            )
+        if not comparison:
+            return [], None
+        accuracy = sum(row["accuracy"] for row in comparison) / len(
+            comparison
+        )
+        return comparison, accuracy
 
     @staticmethod
     def _pixel_coordinates(row_position: int) -> tuple[int, int]:
@@ -251,6 +435,7 @@ class UploadedData(rx.State):
     def _parse_csv(
         filename: str, data: bytes
     ) -> tuple[list[str], list[list[str]]]:
+        """Decode and validate uploaded text rows before database persistence."""
         if PurePath(filename).suffix.lower() != ".csv":
             raise ValueError("Choose a file with a .csv extension.")
         if len(data) > MAX_BYTES:
@@ -327,6 +512,10 @@ class UploadedData(rx.State):
         self.source_error = ""
         self.source_success = ""
         self.mapping_revision += 1
+        self.selected_data_type = "measurement"
+        self.prediction_mapping_fields = []
+        self.dataset_type_error = ""
+        self.dataset_type_success = ""
         self._clear_editor()
 
     def _reload(self):
@@ -344,6 +533,7 @@ class UploadedData(rx.State):
                     "rows": d.row_count,
                     "columns": len(json.loads(d.column_names_json)),
                     "created": d.created_at.strftime("%d %b %Y · %H:%M UTC"),
+                    "data_type": d.data_type.title(),
                 }
                 for d in datasets
             ]
@@ -397,6 +587,7 @@ class UploadedData(rx.State):
                 self.original_filename = selected.original_filename
                 self.columns = json.loads(selected.column_names_json)
                 self.row_count = selected.row_count
+                self.selected_data_type = selected.data_type
                 saved_mapping = json.loads(selected.overview_mapping_json)
                 suggested = self._suggest_mapping(self.columns)
                 self.mapping_fields = [
@@ -414,6 +605,24 @@ class UploadedData(rx.State):
                 self.fixed_month = str(saved_mapping.get("fixed_month", ""))
                 self.selected_source_active = selected.overview_active
                 self.mapping_revision += 1
+                prediction_mapping = json.loads(
+                    selected.prediction_mapping_json
+                )
+                suggested_prediction = self._suggest_prediction_mapping(
+                    self.columns
+                )
+                self.prediction_mapping_fields = [
+                    {
+                        "name": key,
+                        "label": label,
+                        "value": str(
+                            prediction_mapping.get(
+                                key, suggested_prediction[key]
+                            )
+                        ),
+                    }
+                    for key, label in PREDICTION_MAPPING_LABELS.items()
+                ]
                 self.page_index = min(
                     self.page_index,
                     max(0, (selected.row_count - 1) // PAGE_SIZE),
@@ -456,6 +665,7 @@ class UploadedData(rx.State):
 
     @rx.event
     async def import_csv(self, files: list[rx.UploadFile]):
+        """Stage a single uploaded file and queue its validated import."""
         self.error = ""
         self.success = ""
         if len(files) != 1:
@@ -546,6 +756,7 @@ class UploadedData(rx.State):
 
     @rx.event(background=True)
     async def process_csv(self, temporary_name: str, filename: str):
+        """Persist the staged CSV atomically and refresh the dataset catalogue."""
         try:
             new_id, count = await asyncio.to_thread(
                 UploadedData._persist_csv, temporary_name, filename
@@ -584,6 +795,10 @@ class UploadedData(rx.State):
                 if remove:
                     dataset.overview_active = False
                     return
+                if dataset.data_type == "prediction":
+                    raise ValueError(
+                        "Prediction datasets are reserved for Model Insights and cannot be used as an Overview source."
+                    )
                 clean = UploadedData._validate_mapping(
                     json.loads(dataset.column_names_json),
                     dataset.row_count,
@@ -618,6 +833,11 @@ class UploadedData(rx.State):
     @rx.event
     def apply_source(self, form_data: dict[str, Any]):
         if self.source_saving or self.importing or self.loading:
+            return
+        if self.selected_data_type == "prediction":
+            self.source_error = (
+                "Prediction datasets are reserved for Model Insights and cannot be used as an Overview source."
+            )
             return
         mapping = {key: str(form_data.get(key, "")) for key in MAPPING_LABELS}
         mapping["coordinate_mode"] = str(
@@ -689,10 +909,211 @@ class UploadedData(rx.State):
         self.source_success = "Header suggestions restored and manual dates cleared. Review them, then apply to save; nothing has changed yet."
 
     @rx.event
+    def save_dataset_type(self, form_data: dict[str, Any]):
+        """Persist the selected dataset classification and its prediction mapping."""
+        if self.dataset_type_saving or self.loading or self.importing:
+            return
+        data_type = str(form_data.get("data_type", "measurement"))
+        if data_type not in ("measurement", "prediction"):
+            self.dataset_type_error = "Choose a supported dataset type."
+            return
+        mapping = {
+            key: str(form_data.get(key, ""))
+            for key in PREDICTION_MAPPING_LABELS
+        }
+        try:
+            clean_mapping = (
+                self._validate_prediction_mapping(self.columns, mapping)
+                if data_type == "prediction"
+                else {}
+            )
+        except ValueError as e:
+            self.dataset_type_error = str(e)
+            self.dataset_type_success = ""
+            return
+        self.dataset_type_error = ""
+        self.dataset_type_success = ""
+        self.dataset_type_saving = True
+        try:
+            with rx.session() as session:
+                with session.begin():
+                    dataset = session.scalar(
+                        select(UploadedDataset)
+                        .where(UploadedDataset.id == self.selected_id)
+                        .with_for_update()
+                    )
+                    if dataset is None:
+                        raise ValueError(
+                            "This dataset was deleted. Refresh the catalogue and choose another source."
+                        )
+                    if json.loads(dataset.column_names_json) != self.columns:
+                        raise ValueError(
+                            "The columns changed. Refresh the catalogue before changing its type."
+                        )
+                    dataset.data_type = data_type
+                    dataset.prediction_mapping_json = json.dumps(
+                        clean_mapping, ensure_ascii=True
+                    )
+                    if data_type == "prediction":
+                        # Prediction files must not remain eligible as observations.
+                        dataset.overview_active = False
+            self.selected_data_type = data_type
+            self.dataset_type_success = (
+                "Prediction dataset saved for Model Insights."
+                if data_type == "prediction"
+                else "Dataset type saved as Measurement."
+            )
+            self._reload()
+        except ValueError as e:
+            logging.exception(f"Error: {type(e).__name__}")
+            self.dataset_type_error = str(e)
+        except Exception as e:
+            logging.exception(f"Error: {type(e).__name__}")
+            self.dataset_type_error = (
+                "Could not save this dataset type. No changes were saved; please retry."
+            )
+        finally:
+            self.dataset_type_saving = False
+
+    @rx.event
+    def set_dataset_type(self, value: str):
+        """Update the dataset-type selection and clear stale form messages."""
+        if value in ("measurement", "prediction"):
+            self.selected_data_type = value
+            self.dataset_type_error = ""
+            self.dataset_type_success = ""
+
+    @rx.event
+    def select_model_prediction(self, value: str):
+        """Select a saved prediction dataset and queue a comparison refresh."""
+        try:
+            self.model_prediction_id = int(value)
+        except ValueError:
+            self.model_message = "Choose a saved prediction dataset."
+            return
+        return UploadedData.load_model_insights
+
+    @rx.event
+    def load_model_insights(self):
+        """Compare a selected prediction dataset with the active observation source."""
+        try:
+            with rx.session() as session:
+                prediction_datasets = session.scalars(
+                    select(UploadedDataset)
+                    .where(UploadedDataset.data_type == "prediction")
+                    .order_by(
+                        UploadedDataset.created_at.desc(),
+                        UploadedDataset.id.desc(),
+                    )
+                ).all()
+                self.model_predictions = [
+                    {
+                        "id": dataset.id,
+                        "name": dataset.name,
+                        "filename": dataset.original_filename,
+                        "rows": dataset.row_count,
+                        "columns": len(json.loads(dataset.column_names_json)),
+                        "created": dataset.created_at.strftime(
+                            "%d %b %Y · %H:%M UTC"
+                        ),
+                        "data_type": "Prediction",
+                    }
+                    for dataset in prediction_datasets
+                ]
+                if not prediction_datasets:
+                    self.model_prediction_id = 0
+                    self.model_actual_name = ""
+                    self.model_comparison = []
+                    self.model_accuracy = -1
+                    self.model_message = (
+                        "No prediction datasets are configured. Select a dataset in Data and set its type to Prediction."
+                    )
+                    return
+                prediction = next(
+                    (
+                        dataset
+                        for dataset in prediction_datasets
+                        if dataset.id == self.model_prediction_id
+                    ),
+                    prediction_datasets[0],
+                )
+                self.model_prediction_id = prediction.id
+                actual = session.scalar(
+                    select(UploadedDataset)
+                    .where(UploadedDataset.overview_active.is_(True))
+                    .order_by(UploadedDataset.id.desc())
+                )
+                if actual is None:
+                    self.model_actual_name = ""
+                    self.model_comparison = []
+                    self.model_accuracy = -1
+                    self.model_message = (
+                        "Apply a non-prediction dataset as the Overview source in Data to provide recorded sea-ice concentration and matching year/month values."
+                    )
+                    return
+                # The active measurement source is the recorded-data baseline.
+                prediction_columns = json.loads(
+                    prediction.column_names_json
+                )
+                prediction_mapping = json.loads(
+                    prediction.prediction_mapping_json
+                )
+                actual_columns = json.loads(actual.column_names_json)
+                actual_mapping = json.loads(actual.overview_mapping_json)
+                prediction_rows = session.scalars(
+                    select(UploadedDatasetRow.cell_values_json)
+                    .where(UploadedDatasetRow.dataset_id == prediction.id)
+                    .order_by(UploadedDatasetRow.row_position)
+                ).yield_per(1000)
+                actual_rows = session.scalars(
+                    select(UploadedDatasetRow.cell_values_json)
+                    .where(UploadedDatasetRow.dataset_id == actual.id)
+                    .order_by(UploadedDatasetRow.row_position)
+                ).yield_per(1000)
+                predicted = self._monthly_measurements(
+                    prediction_rows,
+                    prediction_columns,
+                    prediction_mapping,
+                    "prediction",
+                )
+                observed = self._monthly_measurements(
+                    actual_rows,
+                    actual_columns,
+                    actual_mapping,
+                    "sea_ice_concentration",
+                )
+                comparison, accuracy = self._compare_monthly_values(
+                    predicted, observed
+                )
+                if accuracy is None:
+                    self.model_actual_name = actual.name
+                    self.model_comparison = []
+                    self.model_accuracy = -1
+                    self.model_message = (
+                        "No valid year/month pairs overlap. Check that the prediction columns and the active Overview mapping include numeric 0–100 concentration and matching dates."
+                    )
+                    return
+                self.model_actual_name = actual.name
+                self.model_comparison = comparison
+                self.model_accuracy = accuracy
+                self.model_message = (
+                    "Accuracy is 100% minus mean absolute error in percentage points, averaged over matched monthly means (bounded to 0–100%)."
+                )
+        except Exception as e:
+            logging.exception(f"Error: {type(e).__name__}")
+            self.model_comparison = []
+            self.model_accuracy = -1
+            self.model_message = (
+                "Could not load the prediction comparison. Refresh Model Insights and retry."
+            )
+
+    @rx.event
     def select_dataset(self, dataset_id: int):
         self.selected_id = dataset_id
         self.source_error = ""
         self.source_success = ""
+        self.dataset_type_error = ""
+        self.dataset_type_success = ""
         self.page_index = 0
         self.success = ""
         self.error = ""

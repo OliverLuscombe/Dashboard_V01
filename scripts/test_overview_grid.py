@@ -1,4 +1,6 @@
 import reflex as rx
+"""Regression tests for legacy grid rasterization, persistence, and cleanup."""
+
 import json
 import tempfile
 import unittest

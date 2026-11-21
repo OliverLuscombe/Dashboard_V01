@@ -1,5 +1,10 @@
 # Uploaded Overview pixel grid
 
+This document describes the retained pixel-grid implementation under `app/`;
+it is not the configured runtime entry point. See the project [design
+document](./design.md) for the active globe architecture and
+[test report](./testing.md) for regression coverage and results.
+
 Overview loads the explicitly applied CSV source on initial page load, on navigation back to Overview, and with **Refresh source / Refresh map**. Applying a source in Data does not transform or validate its measurements. Map Explorer, Compare, and Model Insights retain their synthetic demos. Uploaded Overview uses only actual mapped dates, readings and labels. Its period selectors, pixel raster, summary cards and inspector share one selected period. Synthetic date/split/region controls and the demo model teaser are not shown. Loading and failures never substitute demo data.
 
 ## Coordinates and missing values

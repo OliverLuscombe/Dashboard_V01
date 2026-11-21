@@ -1,3 +1,5 @@
+"""Database models retained for the legacy pixel-grid Overview implementation."""
+
 import reflex as rx
 from datetime import UTC, datetime
 
@@ -16,6 +18,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
+    """Common SQLAlchemy metadata base for legacy tables."""
+
     pass
 
 
@@ -57,6 +61,12 @@ class UploadedDataset(Base):
         Boolean, default=False, server_default=text("false")
     )
     overview_mapping_json: Mapped[str] = mapped_column(
+        Text, default="{}", server_default=text("'{}'")
+    )
+    data_type: Mapped[str] = mapped_column(
+        Text, default="measurement", server_default=text("'measurement'")
+    )
+    prediction_mapping_json: Mapped[str] = mapped_column(
         Text, default="{}", server_default=text("'{}'")
     )
 
