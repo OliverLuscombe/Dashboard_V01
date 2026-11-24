@@ -21,8 +21,8 @@ If you started the app on a different port, replace `3028` with that port.
 
 Startup code:
 
-cd "C:\Users\kitty\Documents\ICT assignment\antarctic_sea_ice_dashboard"
->> $env:REFLEX_DB_URL = "sqlite:///C:/Users/kitty/Documents/ICT assignment/antarctic_sea_ice_dashboard/globe_check.db"
+cd {File path used to store program}
+>> $env:REFLEX_DB_URL = "sqlite:///{File path used to store program}/globe_check.db"
 >> py -3.13 -m reflex run --env prod --frontend-port 3028 --backend-port 3028 --single-port
 
 Reflex server URL:
